@@ -17,6 +17,7 @@ class DataItem(models.Model):
     tags = models.CharField(max_length=250, blank=True)  # Comma-separated tags
     source_url = models.URLField(blank=True)
     notes = models.TextField(blank=True)
+    subcategory = models.CharField(max_length=100, blank=True)  # e.g., "Indie", "AAA"
 
     def __str__(self):
         return self.name

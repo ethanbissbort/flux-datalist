@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cold Storage Dashboard</title>
+  <script src="https://unpkg.com/vue@3"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="container py-4">
+
+  <div id="app">
+    <h1>📦 Cold Storage Dashboard</h1>
+
+    <!-- Filters -->
+    <div class="row g-3 my-3">
+      <div class="col-md-4">
+        <input v-model="search" type="text" class="form-control" placeholder="Search by name or tags...">
+      </div>
+      <div class="col-md-3">
+        <select v-model="selectedCategory" class="form-select">
+          <option value="">All Categories</option>
+          <option v-for="cat in categories" :value="cat">{{ cat }}</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <select v-model="sortKey" class="form-select">
+          <option value="name">Sort by Name</option>
+          <option value="size_estimate_gb">Sort by Size</option>
+          <option value="category">Sort by Category</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Data Table -->
+    <table class="table table-striped">
+      <thead>
+        <tr>
+          <th>Name</th><th>Category</th><th>Size (GB)</th><th>Tags</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr v-for="item in filteredAndSortedItems">
+          <td>{{ item.name }}</td>
+          <td>{{ item.category }}</td>
+          <td>{{ item.size_estimate_gb }}</td>
+          <td>{{ item.tags }}</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- Disk Usage Chart -->
+    <div class="mt-5">
+      <h3>📊 Disk Usage by Category</h3>
+      <canvas id="usageChart" width="600" height="300"></canvas>
+    </div>
+
+    <!-- Grouped View -->
+    <div v-for="(group, name) in groupedItems" :key="name" class="mb-4">
+    <h4>{{ name }}</h4>
+    <table class="table table-sm table-bordered">
+        <thead><tr><th>Name</th><th>Subcategory</th><th>Size (GB)</th><th>Tags</th></tr></thead>
+        <tbody>
+        <tr v-for="item in group">
+            <td>{{ item.name }}</td>
+            <td>{{ item.subcategory }}</td>
+            <td>{{ item.size_estimate_gb }}</td>
+            <td>
+            <span v-for="tag in item.tags.split(',')" class="badge rounded-pill bg-secondary me-1"
+                    style="cursor:pointer" @click="toggleTagFilter(tag.trim())">
+                {{ tag.trim() }}
+            </span>
+            </td>
+        </tr>
+        </tbody>
+    </table>
+    </div>
+
+
+  </div>
+
+  <script>
+    const app = Vue.createApp({
+      data() {
+        return {
+          search: '',
+          selectedCategory: '',
+          sortKey: 'size_estimate_gb',
+          items: [],  // filled dynamically
+          categories: []
+        };
+      },
+      computed: {
+        filteredAndSortedItems() {
+          let filtered = this.items.filter(item => {
+            const searchLower = this.search.toLowerCase();
+            return (
+              item.name.toLowerCase().includes(searchLower) ||
+              item.tags.toLowerCase().includes(searchLower)
+            ) && (this.selectedCategory === '' || item.category === this.selectedCategory);
+          });
+
+          return filtered.sort((a, b) => {
+            const key = this.sortKey;
+            return typeof a[key] === 'string'
+              ? a[key].localeCompare(b[key])
+              : b[key] - a[key];
+          });
+        },
+        groupedItems() {
+            const grouped = {};
+            for (let item of this.filteredAndSortedItems) {
+            const key = `${item.category}`;
+            if (!grouped[key]) grouped[key] = [];
+            grouped[key].push(item);
+            }
+            return grouped;
+        }
+      },
+      methods: {
+        drawChart() {
+          const ctx = document.getElementById('usageChart').getContext('2d');
+          const usage = {};
+          for (const item of this.items) {
+            if (!usage[item.category]) usage[item.category] = 0;
+            usage[item.category] += parseFloat(item.size_estimate_gb || 0);
+          }
+
+          new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: Object.keys(usage),
+              datasets: [{
+                label: 'Disk Usage (GB)',
+                data: Object.values(usage),
+                backgroundColor: 'rgba(54, 162, 235, 0.6)'
+              }]
+            },
+            options: {
+              scales: {
+                y: { beginAtZero: true }
+              }
+            }
+          });
+        }
+      },
+      mounted() {
+        fetch('/api/items/')
+          .then(res => res.json())
+          .then(data => {
+            this.items = data.map(i => ({
+              name: i.name,
+              category: i.category.name,
+              tags: i.tags || '',
+              size_estimate_gb: i.size_estimate_gb || 0
+            }));
+            this.categories = [...new Set(this.items.map(i => i.category))].sort();
+            this.drawChart();
+          });
+      }
+    });
+
+    app.mount('#app');
+  </script>
+
+</body>
+</html>
