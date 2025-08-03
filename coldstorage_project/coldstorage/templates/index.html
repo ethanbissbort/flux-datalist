@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cold Storage Checklist</title>
+</head>
+<body>
+  <h1>📦 Cold Storage Data Items</h1>
+  <form method="POST">
+    {% csrf_token %}
+    <label>Name:</label><input type="text" name="name"><br>
+    <label>Category:</label>
+    <select name="category">
+      {% for cat in categories %}
+        <option value="{{ cat.id }}">{{ cat.name }}</option>
+      {% endfor %}
+    </select><br>
+    <label>Size Estimate (GB):</label><input type="number" step="0.01" name="size_estimate_gb"><br>
+    <label>Tags:</label><input type="text" name="tags"><br>
+    <label>Description:</label><br><textarea name="description" rows="4" cols="50"></textarea><br>
+    <button type="submit">Add Item</button>
+  </form>
+
+  <h2>Current Entries</h2>
+  <ul>
+    {% for item in items %}
+      <li><strong>{{ item.name }}</strong> — {{ item.category.name }} ({{ item.size_estimate_gb }} GB)</li>
+    {% endfor %}
+  </ul>
+</body>
+</html>
