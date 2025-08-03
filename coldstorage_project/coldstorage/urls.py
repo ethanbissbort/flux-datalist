@@ -13,9 +13,6 @@ urlpatterns = [
     path('import-json/', import_json, name='import_json'),
     path('api/', include(router.urls)),
 ]
-    
-def dashboard(request):
-    return render(request, 'dashboard.html')
 
 urlpatterns += [
     path('dashboard/', dashboard),
