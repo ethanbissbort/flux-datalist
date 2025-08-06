@@ -1,6 +1,6 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DataItemViewSet, CategoryViewSet
+from .views import DataItemViewSet, CategoryViewSet, index, import_json, dashboard
 
 from .views import index, import_json
 
