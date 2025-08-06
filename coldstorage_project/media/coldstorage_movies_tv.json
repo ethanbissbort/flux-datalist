@@ -1,0 +1,1502 @@
+[
+  {
+    "name": "Movie 1",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 2",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 3",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 4",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 5",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 6",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 7",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 8",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 9",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 10",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 11",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 6.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 12",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 13",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 14",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 15",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 16",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 17",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 18",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 19",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 20",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 21",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 22",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 23",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 24",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 25",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 26",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 27",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 28",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 29",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 30",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 31",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 32",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 33",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 34",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 35",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 36",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 37",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 38",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 39",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 40",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 41",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 42",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 43",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 44",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 45",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 46",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 47",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 48",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 49",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 50",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 51",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 52",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 53",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 54",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 55",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 56",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 57",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 58",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 59",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 60",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 6.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 61",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 62",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 6.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 63",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 64",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 65",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 66",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 67",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 68",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 69",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 70",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 71",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 6.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 72",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 73",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 74",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 75",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 6.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 76",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 77",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 78",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 79",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 80",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 6.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 81",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 82",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 83",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 84",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 85",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 86",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 10.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 87",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 88",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 89",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 90",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 91",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 7.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 92",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 93",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 4.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 94",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 8.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 95",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 96",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 97",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 98",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 9.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 99",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 3.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Movie 100",
+    "category": "Movies and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.4,
+    "tags": "movie",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 1",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 226.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 2",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 287.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 3",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 167.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 4",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 250.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 5",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 124.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 6",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 151.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 7",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 231.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 8",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 170.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 9",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 129.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 10",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 82.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 11",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 105.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 12",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 168.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 13",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 138.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 14",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 41.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 15",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 141.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 16",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 52.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 17",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 233.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 18",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 54.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 19",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 120.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 20",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 186.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 21",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 145.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 22",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 155.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 23",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 179.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 24",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 173.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 25",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 77.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 26",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 53.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 27",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 253.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 28",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 100.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 29",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 258.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 30",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 229.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 31",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 196.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 32",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 119.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 33",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 244.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 34",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 149.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 35",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 296.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 36",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 282.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 37",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 100.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 38",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 88.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 39",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 85.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 40",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 221.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 41",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 248.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 42",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 62.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 43",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 50.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 44",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 276.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 45",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 136.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 46",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 91.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 47",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 110.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 48",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 270.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 49",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 47.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "TV Show 50",
+    "category": "TV Shows and Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 265.1,
+    "tags": "tv",
+    "source_url": "",
+    "notes": ""
+  }
+]

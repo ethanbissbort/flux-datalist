@@ -1,0 +1,682 @@
+[
+  {
+    "name": "Game 0",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 59.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 1",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 48.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 2",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 23.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 3",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 23.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 4",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 51.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 5",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 77.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 6",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 62.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 7",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 43.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 8",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 80.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 9",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 61.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 10",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 11",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 5.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 12",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 54.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 13",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 33.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 14",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 53.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 15",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 60.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 16",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 71.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 17",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 42.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 18",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 55.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 19",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 33.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 20",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 74.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 21",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 52.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 22",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 32.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 23",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 33.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 24",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 38.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 25",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 20.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 26",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 56.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 27",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 37.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 28",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 39.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Game 29",
+    "category": "Games and Game Genres",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 2.3,
+    "tags": "game",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 0",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.14,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 1",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.05,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 2",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.08,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 3",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.03,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 4",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.19,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 5",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.08,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 6",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.03,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 7",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.01,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 8",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.17,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 9",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.07,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 10",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.13,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 11",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.17,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 12",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.06,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 13",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.2,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 14",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.04,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 15",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.2,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 16",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.12,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 17",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.08,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 18",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.02,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 19",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.12,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 20",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.15,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 21",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.12,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 22",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.12,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 23",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.02,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 24",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.13,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 25",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 0.08,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 26",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.12,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Book 27",
+    "category": "Books",
+    "description": "",
+    "examples": "",
+    "size_estimate_gb": 1.14,
+    "tags": "book",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 0",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 273.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 1",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 1074.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 2",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 959.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 3",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 2850.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 4",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 427.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 5",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 1691.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 6",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 2401.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 7",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 284.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 8",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 712.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  },
+  {
+    "name": "Scientific Archive 9",
+    "category": "Scientific Literature",
+    "description": "High-value open access archive",
+    "examples": "",
+    "size_estimate_gb": 3313.6,
+    "tags": "scientific,dataset,archive",
+    "source_url": "",
+    "notes": ""
+  }
+]
