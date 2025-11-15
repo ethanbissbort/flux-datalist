@@ -7,7 +7,10 @@ from django.contrib import admin
 from django.db.models import QuerySet, Sum
 from django.http import HttpRequest
 from django.utils.html import format_html
-from .models import Category, DataItem
+from .models import (
+    Category, DataItem, StorageFile, Tag,
+    StorageProvider, CostEstimate
+)
 
 
 @admin.register(Category)
@@ -146,6 +149,285 @@ class DataItemAdmin(admin.ModelAdmin):
         updated = queryset.update(priority='high')
         self.message_user(request, f'{updated} item(s) set to high priority.')
     set_high_priority.short_description = 'Set High Priority'
+
+
+@admin.register(StorageFile)
+class StorageFileAdmin(admin.ModelAdmin):
+    """Enhanced admin for StorageFile model."""
+
+    list_display = (
+        'original_filename', 'data_item', 'file_size_display',
+        'storage_location_badge', 'status_badge', 'last_verified_at'
+    )
+    list_filter = (
+        'storage_location', 'status', 'created_at', 'last_verified_at'
+    )
+    search_fields = ('original_filename', 'data_item__name', 'checksum_sha256', 'notes')
+    ordering = ('-created_at',)
+    date_hierarchy = 'created_at'
+
+    fieldsets = (
+        ('File Information', {
+            'fields': ('data_item', 'file', 'original_filename', 'file_size_bytes', 'mime_type')
+        }),
+        ('Storage Details', {
+            'fields': ('storage_location', 'storage_path', 'file_path')
+        }),
+        ('Checksums', {
+            'fields': ('checksum_md5', 'checksum_sha256'),
+            'classes': ('collapse',)
+        }),
+        ('Verification', {
+            'fields': ('status', 'last_verified_at', 'verification_error')
+        }),
+        ('Additional Information', {
+            'fields': ('notes',),
+            'classes': ('collapse',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = (
+        'checksum_md5', 'checksum_sha256', 'last_verified_at',
+        'verification_error', 'created_at', 'updated_at'
+    )
+
+    actions = ['verify_checksums', 'mark_as_verified', 'calculate_checksums']
+
+    def file_size_display(self, obj: StorageFile) -> str:
+        """Display human-readable file size."""
+        return obj.get_file_size_display()
+    file_size_display.short_description = 'Size'
+    file_size_display.admin_order_field = 'file_size_bytes'
+
+    def storage_location_badge(self, obj: StorageFile) -> str:
+        """Display storage location with color coding."""
+        colors = {
+            'local': '#0d6efd',
+            'nas': '#198754',
+            's3': '#fd7e14',
+            'glacier': '#6c757d',
+            'gcs': '#0dcaf0',
+            'azure': '#0d6efd',
+            'backblaze': '#dc3545',
+            'other': '#6c757d',
+        }
+        color = colors.get(obj.storage_location, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px;">{}</span>',
+            color, obj.get_storage_location_display()
+        )
+    storage_location_badge.short_description = 'Storage'
+    storage_location_badge.admin_order_field = 'storage_location'
+
+    def status_badge(self, obj: StorageFile) -> str:
+        """Display status with color coding."""
+        colors = {
+            'pending': '#6c757d',
+            'uploading': '#0d6efd',
+            'stored': '#198754',
+            'verified': '#20c997',
+            'corrupted': '#dc3545',
+            'missing': '#ffc107',
+        }
+        color = colors.get(obj.status, '#6c757d')
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px;">{}</span>',
+            color, obj.get_status_display()
+        )
+    status_badge.short_description = 'Status'
+    status_badge.admin_order_field = 'status'
+
+    # Admin actions
+    def verify_checksums(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Verify checksums for selected files."""
+        verified_count = 0
+        failed_count = 0
+
+        for storage_file in queryset:
+            try:
+                if storage_file.verify_checksum():
+                    verified_count += 1
+                else:
+                    failed_count += 1
+            except Exception:
+                failed_count += 1
+
+        if verified_count > 0:
+            self.message_user(request, f'{verified_count} file(s) verified successfully.')
+        if failed_count > 0:
+            self.message_user(
+                request,
+                f'{failed_count} file(s) failed verification.',
+                level='warning'
+            )
+    verify_checksums.short_description = 'Verify file checksums'
+
+    def mark_as_verified(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Mark selected files as verified without checking."""
+        from django.utils import timezone
+        updated = queryset.update(status='verified', last_verified_at=timezone.now())
+        self.message_user(request, f'{updated} file(s) marked as verified.')
+    mark_as_verified.short_description = 'Mark as Verified (no check)'
+
+    def calculate_checksums(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Calculate checksums for selected files."""
+        calculated_count = 0
+        failed_count = 0
+
+        for storage_file in queryset:
+            try:
+                storage_file.calculate_checksums()
+                storage_file.save()
+                calculated_count += 1
+            except Exception:
+                failed_count += 1
+
+        if calculated_count > 0:
+            self.message_user(request, f'Calculated checksums for {calculated_count} file(s).')
+        if failed_count > 0:
+            self.message_user(
+                request,
+                f'Failed to calculate checksums for {failed_count} file(s).',
+                level='warning'
+            )
+    calculate_checksums.short_description = 'Calculate checksums'
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    """Enhanced admin for Tag model."""
+
+    list_display = ('name', 'color_badge', 'category', 'usage_count_display', 'created_at')
+    list_filter = ('category', 'created_at')
+    search_fields = ('name', 'description')
+    ordering = ('name',)
+    prepopulated_fields = {'slug': ('name',)}
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'slug', 'description', 'color', 'category')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at', 'updated_at')
+
+    def color_badge(self, obj: Tag) -> str:
+        """Display tag with its color."""
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px;">{}</span>',
+            obj.color, obj.name
+        )
+    color_badge.short_description = 'Tag'
+
+    def usage_count_display(self, obj: Tag) -> int:
+        """Display number of items using this tag."""
+        return obj.get_usage_count()
+    usage_count_display.short_description = 'Used by'
+    usage_count_display.admin_order_field = 'data_items__count'
+
+
+@admin.register(StorageProvider)
+class StorageProviderAdmin(admin.ModelAdmin):
+    """Enhanced admin for StorageProvider model."""
+
+    list_display = (
+        'name', 'provider_type', 'cost_per_gb_monthly',
+        'retrieval_cost_per_gb', 'is_active', 'estimate_count_display'
+    )
+    list_filter = ('provider_type', 'is_active', 'created_at')
+    search_fields = ('name', 'description')
+    ordering = ('name',)
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'provider_type', 'description', 'url', 'is_active')
+        }),
+        ('Pricing', {
+            'fields': (
+                'cost_per_gb_monthly', 'retrieval_cost_per_gb',
+                'api_cost_per_1000_requests'
+            )
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at', 'updated_at')
+
+    def estimate_count_display(self, obj: StorageProvider) -> int:
+        """Display number of cost estimates."""
+        return obj.cost_estimates.count()
+    estimate_count_display.short_description = 'Estimates'
+
+
+@admin.register(CostEstimate)
+class CostEstimateAdmin(admin.ModelAdmin):
+    """Enhanced admin for CostEstimate model."""
+
+    list_display = (
+        'data_item', 'provider', 'estimated_size_gb',
+        'monthly_storage_cost', 'annual_storage_cost',
+        'is_active', 'created_at'
+    )
+    list_filter = ('provider', 'is_active', 'created_at')
+    search_fields = ('data_item__name', 'provider__name', 'notes')
+    ordering = ('-created_at',)
+
+    fieldsets = (
+        ('Estimate Details', {
+            'fields': ('data_item', 'provider', 'estimated_size_gb', 'is_active')
+        }),
+        ('Estimated Costs', {
+            'fields': (
+                'monthly_storage_cost', 'annual_storage_cost',
+                'estimated_retrieval_cost'
+            )
+        }),
+        ('Actual Costs', {
+            'fields': ('actual_monthly_cost', 'actual_retrieval_cost')
+        }),
+        ('Additional Costs', {
+            'fields': ('bandwidth_cost', 'api_request_cost'),
+            'classes': ('collapse',)
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = (
+        'monthly_storage_cost', 'annual_storage_cost',
+        'estimated_retrieval_cost', 'created_at', 'updated_at'
+    )
+
+    actions = ['recalculate_costs']
+
+    def recalculate_costs(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Recalculate costs for selected estimates."""
+        updated = 0
+        for estimate in queryset:
+            estimate.calculate_costs()
+            estimate.save()
+            updated += 1
+        self.message_user(request, f'Recalculated costs for {updated} estimate(s).')
+    recalculate_costs.short_description = 'Recalculate costs'
 
 
 # Customize admin site header and title

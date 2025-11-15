@@ -2,10 +2,13 @@
 Service layer for Cold Storage app.
 Contains business logic for data operations, separated from views.
 """
+import csv
 import json
+from io import BytesIO, StringIO
 from typing import Dict, List, Tuple, Any, Optional
 from django.core.files.uploadedfile import UploadedFile
-from .models import Category, DataItem
+from django.db.models import QuerySet
+from .models import Category, DataItem, Tag
 
 
 class ImportResult:
@@ -225,3 +228,330 @@ class DataItemService:
                 'id', 'name', 'item_count', 'total_size'
             ).order_by('-total_size')
         )
+
+
+class ExportService:
+    """Service for exporting data in various formats."""
+
+    @staticmethod
+    def _prepare_item_data(item: DataItem) -> Dict[str, Any]:
+        """Prepare a single item's data for export."""
+        return {
+            'id': item.id,
+            'name': item.name,
+            'category': item.category.name,
+            'category_path': item.category.get_full_path(),
+            'subcategory': item.subcategory,
+            'description': item.description,
+            'examples': item.examples,
+            'size_estimate_gb': item.size_estimate_gb,
+            'size_display': item.get_size_display(),
+            'tags': item.tags,
+            'source_url': item.source_url,
+            'notes': item.notes,
+            'priority': item.priority,
+            'priority_display': item.get_priority_display(),
+            'status': item.status,
+            'status_display': item.get_status_display(),
+            'created_at': item.created_at.isoformat() if item.created_at else None,
+            'updated_at': item.updated_at.isoformat() if item.updated_at else None,
+        }
+
+    @classmethod
+    def export_to_json(cls, queryset: QuerySet[DataItem]) -> str:
+        """
+        Export queryset to JSON format.
+        Returns JSON string.
+        """
+        data = [cls._prepare_item_data(item) for item in queryset]
+        return json.dumps(data, indent=2, ensure_ascii=False)
+
+    @classmethod
+    def export_to_csv(cls, queryset: QuerySet[DataItem]) -> str:
+        """
+        Export queryset to CSV format.
+        Returns CSV string.
+        """
+        output = StringIO()
+
+        # Define CSV columns
+        fieldnames = [
+            'id', 'name', 'category', 'category_path', 'subcategory',
+            'description', 'examples', 'size_estimate_gb', 'size_display',
+            'tags', 'source_url', 'notes', 'priority', 'priority_display',
+            'status', 'status_display', 'created_at', 'updated_at'
+        ]
+
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for item in queryset:
+            writer.writerow(cls._prepare_item_data(item))
+
+        return output.getvalue()
+
+    @classmethod
+    def export_to_excel(cls, queryset: QuerySet[DataItem]) -> BytesIO:
+        """
+        Export queryset to Excel format.
+        Returns BytesIO object containing Excel file.
+        """
+        try:
+            import openpyxl
+            from openpyxl.styles import Font, PatternFill, Alignment
+        except ImportError:
+            raise ImportError(
+                "openpyxl is required for Excel export. "
+                "Install it with: pip install openpyxl"
+            )
+
+        # Create workbook and worksheet
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Data Items"
+
+        # Define headers
+        headers = [
+            'ID', 'Name', 'Category', 'Category Path', 'Subcategory',
+            'Description', 'Examples', 'Size (GB)', 'Size Display',
+            'Tags', 'Source URL', 'Notes', 'Priority', 'Priority Display',
+            'Status', 'Status Display', 'Created At', 'Updated At'
+        ]
+
+        # Style headers
+        header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+        header_font = Font(color="FFFFFF", bold=True)
+
+        for col_num, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_num)
+            cell.value = header
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Write data
+        for row_num, item in enumerate(queryset, 2):
+            data = cls._prepare_item_data(item)
+            ws.cell(row=row_num, column=1, value=data['id'])
+            ws.cell(row=row_num, column=2, value=data['name'])
+            ws.cell(row=row_num, column=3, value=data['category'])
+            ws.cell(row=row_num, column=4, value=data['category_path'])
+            ws.cell(row=row_num, column=5, value=data['subcategory'])
+            ws.cell(row=row_num, column=6, value=data['description'])
+            ws.cell(row=row_num, column=7, value=data['examples'])
+            ws.cell(row=row_num, column=8, value=data['size_estimate_gb'])
+            ws.cell(row=row_num, column=9, value=data['size_display'])
+            ws.cell(row=row_num, column=10, value=data['tags'])
+            ws.cell(row=row_num, column=11, value=data['source_url'])
+            ws.cell(row=row_num, column=12, value=data['notes'])
+            ws.cell(row=row_num, column=13, value=data['priority'])
+            ws.cell(row=row_num, column=14, value=data['priority_display'])
+            ws.cell(row=row_num, column=15, value=data['status'])
+            ws.cell(row=row_num, column=16, value=data['status_display'])
+            ws.cell(row=row_num, column=17, value=data['created_at'])
+            ws.cell(row=row_num, column=18, value=data['updated_at'])
+
+        # Auto-adjust column widths
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+
+        # Save to BytesIO
+        output = BytesIO()
+        wb.save(output)
+        output.seek(0)
+        return output
+
+    @classmethod
+    def export_categories_to_json(cls, queryset: QuerySet[Category]) -> str:
+        """Export categories to JSON format."""
+        data = []
+        for category in queryset:
+            data.append({
+                'id': category.id,
+                'name': category.name,
+                'description': category.description,
+                'parent_id': category.parent_id,
+                'parent_name': category.parent.name if category.parent else None,
+                'full_path': category.get_full_path(),
+                'created_at': category.created_at.isoformat() if category.created_at else None,
+                'updated_at': category.updated_at.isoformat() if category.updated_at else None,
+            })
+        return json.dumps(data, indent=2, ensure_ascii=False)
+
+    @classmethod
+    def export_categories_to_csv(cls, queryset: QuerySet[Category]) -> str:
+        """Export categories to CSV format."""
+        output = StringIO()
+
+        fieldnames = [
+            'id', 'name', 'description', 'parent_id', 'parent_name',
+            'full_path', 'created_at', 'updated_at'
+        ]
+
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+
+        for category in queryset:
+            writer.writerow({
+                'id': category.id,
+                'name': category.name,
+                'description': category.description,
+                'parent_id': category.parent_id,
+                'parent_name': category.parent.name if category.parent else '',
+                'full_path': category.get_full_path(),
+                'created_at': category.created_at.isoformat() if category.created_at else '',
+                'updated_at': category.updated_at.isoformat() if category.updated_at else '',
+            })
+
+        return output.getvalue()
+
+
+class BatchOperationService:
+    """Service for batch operations on data items."""
+
+    @staticmethod
+    def bulk_update_status(queryset: QuerySet[DataItem], status: str) -> int:
+        """Bulk update status for data items."""
+        return queryset.update(status=status)
+
+    @staticmethod
+    def bulk_update_priority(queryset: QuerySet[DataItem], priority: str) -> int:
+        """Bulk update priority for data items."""
+        return queryset.update(priority=priority)
+
+    @staticmethod
+    def bulk_update_category(queryset: QuerySet[DataItem], category_id: int) -> int:
+        """Bulk update category for data items."""
+        return queryset.update(category_id=category_id)
+
+    @staticmethod
+    def bulk_add_tags(queryset: QuerySet[DataItem], tag_ids: List[int]) -> Dict[str, int]:
+        """
+        Bulk add tags to data items.
+        Returns dict with updated and error counts.
+        """
+        tags = Tag.objects.filter(id__in=tag_ids)
+        updated = 0
+
+        for item in queryset:
+            item.tag_set.add(*tags)
+            updated += 1
+
+        return {'updated': updated, 'tags_added': len(tags)}
+
+    @staticmethod
+    def bulk_remove_tags(queryset: QuerySet[DataItem], tag_ids: List[int]) -> Dict[str, int]:
+        """
+        Bulk remove tags from data items.
+        Returns dict with updated and error counts.
+        """
+        tags = Tag.objects.filter(id__in=tag_ids)
+        updated = 0
+
+        for item in queryset:
+            item.tag_set.remove(*tags)
+            updated += 1
+
+        return {'updated': updated, 'tags_removed': len(tags)}
+
+    @staticmethod
+    def bulk_set_tags(queryset: QuerySet[DataItem], tag_ids: List[int]) -> Dict[str, int]:
+        """
+        Bulk set tags for data items (replaces existing tags).
+        Returns dict with updated count.
+        """
+        tags = Tag.objects.filter(id__in=tag_ids)
+        updated = 0
+
+        for item in queryset:
+            item.tag_set.set(tags)
+            updated += 1
+
+        return {'updated': updated, 'tags_set': len(tags)}
+
+    @staticmethod
+    def bulk_delete(queryset: QuerySet[DataItem]) -> int:
+        """
+        Bulk delete data items.
+        Returns count of deleted items.
+        """
+        count, _ = queryset.delete()
+        return count
+
+    @classmethod
+    def get_batch_operation_summary(cls, operation: str, queryset: QuerySet[DataItem], **kwargs) -> Dict[str, Any]:
+        """
+        Execute a batch operation and return summary.
+        """
+        initial_count = queryset.count()
+
+        if operation == 'update_status':
+            updated = cls.bulk_update_status(queryset, kwargs['status'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'updated': updated,
+                'status': kwargs['status']
+            }
+
+        elif operation == 'update_priority':
+            updated = cls.bulk_update_priority(queryset, kwargs['priority'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'updated': updated,
+                'priority': kwargs['priority']
+            }
+
+        elif operation == 'update_category':
+            updated = cls.bulk_update_category(queryset, kwargs['category_id'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'updated': updated,
+                'category_id': kwargs['category_id']
+            }
+
+        elif operation == 'add_tags':
+            result = cls.bulk_add_tags(queryset, kwargs['tag_ids'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                **result
+            }
+
+        elif operation == 'remove_tags':
+            result = cls.bulk_remove_tags(queryset, kwargs['tag_ids'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                **result
+            }
+
+        elif operation == 'set_tags':
+            result = cls.bulk_set_tags(queryset, kwargs['tag_ids'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                **result
+            }
+
+        elif operation == 'delete':
+            deleted = cls.bulk_delete(queryset)
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'deleted': deleted
+            }
+
+        else:
+            raise ValueError(f"Unknown batch operation: {operation}")
