@@ -4,12 +4,16 @@ Includes both REST API endpoints and traditional views.
 """
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
-from .views import DataItemViewSet, CategoryViewSet, index, import_json, dashboard
+from .views import (
+    DataItemViewSet, CategoryViewSet, StorageFileViewSet,
+    index, import_json, dashboard
+)
 
 # REST API router configuration
 router = DefaultRouter()
 router.register(r'items', DataItemViewSet, basename='dataitem')
 router.register(r'categories', CategoryViewSet, basename='category')
+router.register(r'files', StorageFileViewSet, basename='storagefile')
 
 # URL patterns
 urlpatterns = [

@@ -1,6 +1,9 @@
+import hashlib
+import os
 from django.db import models
 from django.core.validators import MinValueValidator
 from django.urls import reverse
+from django.conf import settings
 
 
 class Category(models.Model):
@@ -169,3 +172,203 @@ class DataItem(models.Model):
         return cls.objects.values('category__name').annotate(
             total_size=Sum('size_estimate_gb')
         ).order_by('-total_size')
+
+
+class StorageFile(models.Model):
+    """
+    Represents a physical file associated with a data item.
+    Tracks file location, checksums, and verification status.
+    """
+    data_item = models.ForeignKey(
+        DataItem,
+        on_delete=models.CASCADE,
+        related_name='storage_files',
+        help_text="Data item this file belongs to"
+    )
+    file = models.FileField(
+        upload_to='storage_files/%Y/%m/%d/',
+        blank=True,
+        null=True,
+        help_text="Uploaded file (optional if tracking external storage)"
+    )
+    file_path = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="Path to file (local or remote)"
+    )
+    original_filename = models.CharField(
+        max_length=255,
+        help_text="Original filename"
+    )
+    file_size_bytes = models.BigIntegerField(
+        help_text="File size in bytes",
+        validators=[MinValueValidator(0)]
+    )
+
+    # Checksums for verification
+    checksum_md5 = models.CharField(
+        max_length=32,
+        blank=True,
+        help_text="MD5 checksum (32 hex chars)"
+    )
+    checksum_sha256 = models.CharField(
+        max_length=64,
+        blank=True,
+        help_text="SHA-256 checksum (64 hex chars)"
+    )
+
+    # Storage information
+    storage_location = models.CharField(
+        max_length=50,
+        choices=[
+            ('local', 'Local Storage'),
+            ('nas', 'Network Attached Storage'),
+            ('s3', 'Amazon S3'),
+            ('glacier', 'Amazon Glacier'),
+            ('gcs', 'Google Cloud Storage'),
+            ('azure', 'Azure Blob Storage'),
+            ('backblaze', 'Backblaze B2'),
+            ('other', 'Other'),
+        ],
+        default='local',
+        help_text="Where the file is stored"
+    )
+    storage_path = models.CharField(
+        max_length=500,
+        blank=True,
+        help_text="Full path or URL to the stored file"
+    )
+
+    # Verification status
+    status = models.CharField(
+        max_length=20,
+        choices=[
+            ('pending', 'Pending'),
+            ('uploading', 'Uploading'),
+            ('stored', 'Stored'),
+            ('verified', 'Verified'),
+            ('corrupted', 'Corrupted'),
+            ('missing', 'Missing'),
+        ],
+        default='pending',
+        help_text="Current file status"
+    )
+    last_verified_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="When the file was last verified"
+    )
+    verification_error = models.TextField(
+        blank=True,
+        help_text="Error message if verification failed"
+    )
+
+    # Metadata
+    mime_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="MIME type of the file"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Additional notes about this file"
+    )
+
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['data_item', 'status']),
+            models.Index(fields=['checksum_sha256']),
+            models.Index(fields=['storage_location']),
+        ]
+
+    def __str__(self):
+        return f"{self.original_filename} ({self.get_storage_location_display()})"
+
+    def get_file_size_display(self):
+        """Returns human-readable file size"""
+        size_bytes = self.file_size_bytes
+
+        if size_bytes < 1024:
+            return f"{size_bytes} B"
+        elif size_bytes < 1024 * 1024:
+            return f"{size_bytes / 1024:.1f} KB"
+        elif size_bytes < 1024 * 1024 * 1024:
+            return f"{size_bytes / (1024 * 1024):.1f} MB"
+        else:
+            return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+    def calculate_checksums(self, file_obj=None):
+        """
+        Calculate MD5 and SHA-256 checksums for the file.
+        Uses the uploaded file or reads from storage_path.
+        """
+        if file_obj is None and self.file:
+            file_obj = self.file.open('rb')
+        elif file_obj is None and self.storage_path and os.path.exists(self.storage_path):
+            file_obj = open(self.storage_path, 'rb')
+        elif file_obj is None:
+            raise ValueError("No file available for checksum calculation")
+
+        md5_hash = hashlib.md5()
+        sha256_hash = hashlib.sha256()
+
+        # Read file in chunks to handle large files
+        for chunk in iter(lambda: file_obj.read(8192), b''):
+            md5_hash.update(chunk)
+            sha256_hash.update(chunk)
+
+        self.checksum_md5 = md5_hash.hexdigest()
+        self.checksum_sha256 = sha256_hash.hexdigest()
+
+        # Close file if we opened it
+        if hasattr(file_obj, 'close'):
+            file_obj.close()
+
+    def verify_checksum(self, checksum_type='sha256'):
+        """
+        Verify file integrity by recalculating checksum.
+        Returns True if checksum matches, False otherwise.
+        """
+        from django.utils import timezone
+
+        try:
+            # Store original checksums
+            original_md5 = self.checksum_md5
+            original_sha256 = self.checksum_sha256
+
+            # Recalculate checksums
+            self.calculate_checksums()
+
+            # Check if they match
+            if checksum_type == 'md5':
+                verified = self.checksum_md5 == original_md5
+            else:  # sha256
+                verified = self.checksum_sha256 == original_sha256
+
+            # Update status
+            self.last_verified_at = timezone.now()
+            if verified:
+                self.status = 'verified'
+                self.verification_error = ''
+            else:
+                self.status = 'corrupted'
+                self.verification_error = f'{checksum_type.upper()} checksum mismatch'
+
+            self.save()
+            return verified
+
+        except Exception as e:
+            self.status = 'corrupted'
+            self.verification_error = str(e)
+            self.last_verified_at = timezone.now()
+            self.save()
+            return False
+
+    def get_absolute_url(self):
+        """Returns URL for this file (useful for future detail views)"""
+        return reverse('storagefile-detail', kwargs={'pk': self.pk})

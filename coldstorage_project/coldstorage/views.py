@@ -12,13 +12,14 @@ from django.http import HttpRequest, HttpResponse
 from django.db.models import QuerySet
 from django.views.decorators.http import require_http_methods
 
-from .models import DataItem, Category
+from .models import DataItem, Category, StorageFile
 from .serializers import (
     CategorySerializer, DataItemSerializer,
-    DataItemListSerializer, DataItemWriteSerializer
+    DataItemListSerializer, DataItemWriteSerializer,
+    StorageFileSerializer, StorageFileUploadSerializer
 )
 from .forms import DataItemForm, JSONImportForm, DataItemFilterForm
-from .services import JSONImportService, DataItemService
+from .services import JSONImportService, DataItemService, ExportService
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -56,6 +57,23 @@ class CategoryViewSet(viewsets.ModelViewSet):
         }
         return Response(stats)
 
+    @action(detail=False, methods=['get'])
+    def export(self, request: HttpRequest) -> HttpResponse:
+        """Export categories in various formats."""
+        format_type = request.query_params.get('format', 'json').lower()
+        queryset = self.filter_queryset(self.get_queryset())
+
+        if format_type == 'csv':
+            content = ExportService.export_categories_to_csv(queryset)
+            response = HttpResponse(content, content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="categories.csv"'
+            return response
+        else:  # json
+            content = ExportService.export_categories_to_json(queryset)
+            response = HttpResponse(content, content_type='application/json')
+            response['Content-Disposition'] = 'attachment; filename="categories.json"'
+            return response
+
 
 class DataItemViewSet(viewsets.ModelViewSet):
     """
@@ -87,6 +105,95 @@ class DataItemViewSet(viewsets.ModelViewSet):
         """Get items grouped by category with statistics."""
         category_stats = DataItemService.get_category_statistics()
         return Response(category_stats)
+
+    @action(detail=False, methods=['get'])
+    def export(self, request: HttpRequest) -> HttpResponse:
+        """Export data items in various formats (CSV, JSON, Excel)."""
+        format_type = request.query_params.get('format', 'json').lower()
+        queryset = self.filter_queryset(self.get_queryset())
+
+        if format_type == 'csv':
+            content = ExportService.export_to_csv(queryset)
+            response = HttpResponse(content, content_type='text/csv')
+            response['Content-Disposition'] = 'attachment; filename="data_items.csv"'
+            return response
+        elif format_type == 'excel' or format_type == 'xlsx':
+            try:
+                excel_file = ExportService.export_to_excel(queryset)
+                response = HttpResponse(
+                    excel_file.getvalue(),
+                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+                )
+                response['Content-Disposition'] = 'attachment; filename="data_items.xlsx"'
+                return response
+            except ImportError as e:
+                return HttpResponse(str(e), status=500)
+        else:  # json
+            content = ExportService.export_to_json(queryset)
+            response = HttpResponse(content, content_type='application/json')
+            response['Content-Disposition'] = 'attachment; filename="data_items.json"'
+            return response
+
+
+class StorageFileViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet for StorageFile model.
+    Handles file uploads, checksum verification, and storage tracking.
+    """
+    queryset = StorageFile.objects.select_related('data_item').all()
+    filterset_fields = ['data_item', 'storage_location', 'status']
+    search_fields = ['original_filename', 'checksum_sha256', 'notes']
+    ordering_fields = ['created_at', 'file_size_bytes', 'last_verified_at']
+    ordering = ['-created_at']
+
+    def get_serializer_class(self):
+        """Use upload serializer for creating files, full serializer otherwise."""
+        if self.action == 'create':
+            return StorageFileUploadSerializer
+        return StorageFileSerializer
+
+    @action(detail=True, methods=['post'])
+    def verify(self, request: HttpRequest, pk: int = None) -> Response:
+        """Verify file checksum integrity."""
+        storage_file = self.get_object()
+        checksum_type = request.data.get('checksum_type', 'sha256')
+
+        try:
+            verified = storage_file.verify_checksum(checksum_type)
+            return Response({
+                'verified': verified,
+                'status': storage_file.status,
+                'last_verified_at': storage_file.last_verified_at,
+                'error': storage_file.verification_error if not verified else None
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=True, methods=['post'])
+    def calculate_checksum(self, request: HttpRequest, pk: int = None) -> Response:
+        """Calculate file checksums."""
+        storage_file = self.get_object()
+
+        try:
+            storage_file.calculate_checksums()
+            storage_file.save()
+            return Response({
+                'md5': storage_file.checksum_md5,
+                'sha256': storage_file.checksum_sha256
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=500)
+
+    @action(detail=False, methods=['get'])
+    def by_status(self, request: HttpRequest) -> Response:
+        """Get storage files grouped by status."""
+        from django.db.models import Count
+
+        stats = StorageFile.objects.values('status').annotate(
+            count=Count('id')
+        ).order_by('-count')
+
+        return Response(list(stats))
 
 
 @require_http_methods(["GET", "POST"])
