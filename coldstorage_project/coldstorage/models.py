@@ -51,6 +51,145 @@ class Category(models.Model):
         return descendants
 
 
+class Tag(models.Model):
+    """
+    Tags for organizing and categorizing data items.
+    Supports color coding and optional category grouping.
+    """
+    name = models.CharField(
+        max_length=50,
+        unique=True,
+        help_text="Tag name (e.g., 'Linux', 'Open Source', 'Media')"
+    )
+    slug = models.SlugField(
+        max_length=50,
+        unique=True,
+        help_text="URL-friendly version of name"
+    )
+    description = models.TextField(
+        blank=True,
+        help_text="Optional description of this tag"
+    )
+    color = models.CharField(
+        max_length=7,
+        default='#6c757d',
+        help_text="Hex color code for UI display (e.g., #FF5733)"
+    )
+    category = models.ForeignKey(
+        Category,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name='tags',
+        help_text="Optional category grouping"
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+        indexes = [
+            models.Index(fields=['name']),
+            models.Index(fields=['slug']),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        """Auto-generate slug from name if not provided."""
+        if not self.slug:
+            from django.utils.text import slugify
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def get_usage_count(self):
+        """Returns number of data items using this tag."""
+        return self.data_items.count()
+
+
+class StorageProvider(models.Model):
+    """
+    Storage provider information and pricing.
+    Used for cost estimation and tracking.
+    """
+    name = models.CharField(
+        max_length=100,
+        unique=True,
+        help_text="Provider name (e.g., 'AWS S3', 'Google Cloud Storage')"
+    )
+    provider_type = models.CharField(
+        max_length=50,
+        choices=[
+            ('local', 'Local Storage'),
+            ('nas', 'Network Attached Storage'),
+            ('cloud_hot', 'Cloud Storage (Hot)'),
+            ('cloud_warm', 'Cloud Storage (Warm)'),
+            ('cloud_cold', 'Cloud Storage (Cold/Archive)'),
+            ('tape', 'Tape Storage'),
+            ('other', 'Other'),
+        ],
+        default='cloud_hot',
+        help_text="Type of storage provider"
+    )
+
+    # Pricing information
+    cost_per_gb_monthly = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0,
+        help_text="Monthly cost per GB (e.g., $0.023000)"
+    )
+    retrieval_cost_per_gb = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0,
+        help_text="Cost per GB for data retrieval (e.g., $0.090000)"
+    )
+    api_cost_per_1000_requests = models.DecimalField(
+        max_digits=10,
+        decimal_places=6,
+        default=0,
+        help_text="Cost per 1000 API requests"
+    )
+
+    # Provider details
+    description = models.TextField(
+        blank=True,
+        help_text="Provider description and notes"
+    )
+    url = models.URLField(
+        blank=True,
+        help_text="Provider website URL"
+    )
+
+    # Status
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this provider is currently in use"
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_provider_type_display()})"
+
+    def calculate_monthly_cost(self, size_gb):
+        """Calculate monthly cost for given storage size."""
+        return float(self.cost_per_gb_monthly) * size_gb
+
+    def calculate_retrieval_cost(self, size_gb):
+        """Calculate one-time retrieval cost for given size."""
+        return float(self.retrieval_cost_per_gb) * size_gb
+
+
 class DataItem(models.Model):
     """
     Represents a data item to be stored in cold storage.
@@ -74,16 +213,27 @@ class DataItem(models.Model):
         help_text="Specific examples or instances of this item"
     )
     size_estimate_gb = models.FloatField(
-        null=True, 
+        null=True,
         blank=True,
         validators=[MinValueValidator(0.0)],
         help_text="Estimated storage size in gigabytes"
     )
-    tags = models.CharField(
-        max_length=250, 
+
+    # Tags - M2M relationship
+    tag_set = models.ManyToManyField(
+        Tag,
         blank=True,
-        help_text="Comma-separated tags for filtering and search"
+        related_name='data_items',
+        help_text="Tags for categorization and filtering"
     )
+
+    # Legacy tags field (kept for migration, will be deprecated)
+    tags_old = models.CharField(
+        max_length=250,
+        blank=True,
+        help_text="[DEPRECATED] Old comma-separated tags (migrating to tag_set)"
+    )
+
     source_url = models.URLField(
         blank=True,
         help_text="URL where this data can be obtained"
@@ -136,10 +286,25 @@ class DataItem(models.Model):
         return self.name
 
     def get_tags_list(self):
-        """Returns tags as a list, handling empty strings"""
-        if not self.tags.strip():
-            return []
-        return [tag.strip() for tag in self.tags.split(',') if tag.strip()]
+        """Returns tags as a list of tag names"""
+        return [tag.name for tag in self.tag_set.all()]
+
+    def get_tags_display(self):
+        """Returns comma-separated list of tag names"""
+        return ', '.join(self.get_tags_list())
+
+    def add_tags_from_string(self, tags_string):
+        """
+        Add tags from a comma-separated string.
+        Creates tags if they don't exist.
+        """
+        if not tags_string:
+            return
+
+        tag_names = [t.strip() for t in tags_string.split(',') if t.strip()]
+        for tag_name in tag_names:
+            tag, created = Tag.objects.get_or_create(name=tag_name)
+            self.tag_set.add(tag)
 
     def get_size_display(self):
         """Returns human-readable size format"""
@@ -372,3 +537,148 @@ class StorageFile(models.Model):
     def get_absolute_url(self):
         """Returns URL for this file (useful for future detail views)"""
         return reverse('storagefile-detail', kwargs={'pk': self.pk})
+
+
+class CostEstimate(models.Model):
+    """
+    Cost estimate for storing a data item with a specific provider.
+    Tracks estimated and actual costs for storage and retrieval.
+    """
+    data_item = models.ForeignKey(
+        DataItem,
+        on_delete=models.CASCADE,
+        related_name='cost_estimates',
+        help_text="Data item this cost estimate is for"
+    )
+    provider = models.ForeignKey(
+        StorageProvider,
+        on_delete=models.CASCADE,
+        related_name='cost_estimates',
+        help_text="Storage provider"
+    )
+
+    # Size information
+    estimated_size_gb = models.FloatField(
+        validators=[MinValueValidator(0.0)],
+        help_text="Estimated storage size in GB"
+    )
+
+    # Cost estimates
+    monthly_storage_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Estimated monthly storage cost"
+    )
+    annual_storage_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Estimated annual storage cost"
+    )
+    estimated_retrieval_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Estimated one-time retrieval cost"
+    )
+
+    # Actual costs (if available)
+    actual_monthly_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Actual monthly cost (from bills)"
+    )
+    actual_retrieval_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        help_text="Actual retrieval cost (from bills)"
+    )
+
+    # Additional costs
+    bandwidth_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Bandwidth/egress costs"
+    )
+    api_request_cost = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="API request costs"
+    )
+
+    # Status
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Whether this estimate is currently active"
+    )
+    notes = models.TextField(
+        blank=True,
+        help_text="Additional notes about this cost estimate"
+    )
+
+    # Metadata
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['data_item', 'provider']
+        indexes = [
+            models.Index(fields=['data_item', 'provider']),
+            models.Index(fields=['is_active']),
+        ]
+
+    def __str__(self):
+        return f"{self.data_item.name} @ {self.provider.name}"
+
+    def save(self, *args, **kwargs):
+        """Auto-calculate costs before saving."""
+        if not self.monthly_storage_cost:
+            self.calculate_costs()
+        super().save(*args, **kwargs)
+
+    def calculate_costs(self):
+        """Calculate estimated costs based on provider pricing."""
+        size_gb = self.estimated_size_gb or self.data_item.size_estimate_gb or 0
+
+        # Monthly storage cost
+        self.monthly_storage_cost = round(
+            self.provider.calculate_monthly_cost(size_gb), 2
+        )
+
+        # Annual storage cost
+        self.annual_storage_cost = round(
+            float(self.monthly_storage_cost) * 12, 2
+        )
+
+        # Retrieval cost
+        self.estimated_retrieval_cost = round(
+            self.provider.calculate_retrieval_cost(size_gb), 2
+        )
+
+    def get_total_first_year_cost(self):
+        """Calculate total cost for first year (storage + retrieval)."""
+        return float(self.annual_storage_cost) + float(self.estimated_retrieval_cost)
+
+    def get_cost_comparison(self):
+        """Get comparison between estimated and actual costs."""
+        if not self.actual_monthly_cost:
+            return None
+
+        return {
+            'estimated': float(self.monthly_storage_cost),
+            'actual': float(self.actual_monthly_cost),
+            'difference': float(self.actual_monthly_cost) - float(self.monthly_storage_cost),
+            'percentage_diff': (
+                (float(self.actual_monthly_cost) - float(self.monthly_storage_cost))
+                / float(self.monthly_storage_cost) * 100
+                if self.monthly_storage_cost > 0 else 0
+            )
+        }

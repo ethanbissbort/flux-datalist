@@ -2,7 +2,7 @@
 Forms for the Cold Storage app.
 Provides validation and cleaned data for web forms.
 """
-from typing import Any
+from typing import Any, Dict
 from django import forms
 from .models import DataItem, Category
 
@@ -14,7 +14,7 @@ class DataItemForm(forms.ModelForm):
         model = DataItem
         fields = [
             'name', 'category', 'subcategory', 'description', 'examples',
-            'size_estimate_gb', 'tags', 'source_url', 'notes',
+            'size_estimate_gb', 'tags_old', 'source_url', 'notes',
             'priority', 'status'
         ]
         widgets = {
@@ -43,7 +43,7 @@ class DataItemForm(forms.ModelForm):
                 'step': '0.01',
                 'min': '0'
             }),
-            'tags': forms.TextInput(attrs={
+            'tags_old': forms.TextInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'Comma-separated tags'
             }),
@@ -74,9 +74,9 @@ class DataItemForm(forms.ModelForm):
             raise forms.ValidationError('Size estimate cannot be negative.')
         return size
 
-    def clean_tags(self) -> str:
+    def clean_tags_old(self) -> str:
         """Clean and normalize tags."""
-        tags = self.cleaned_data.get('tags', '')
+        tags = self.cleaned_data.get('tags_old', '')
         if tags:
             # Remove extra whitespace and normalize commas
             tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
@@ -206,7 +206,7 @@ class DataItemFilterForm(forms.Form):
             from django.db.models import Q
             queryset = queryset.filter(
                 Q(name__icontains=search) |
-                Q(tags__icontains=search) |
+                Q(tags_old__icontains=search) |
                 Q(description__icontains=search)
             )
 

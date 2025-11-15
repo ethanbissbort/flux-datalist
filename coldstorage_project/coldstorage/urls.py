@@ -6,6 +6,7 @@ from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
     DataItemViewSet, CategoryViewSet, StorageFileViewSet,
+    TagViewSet, StorageProviderViewSet, CostEstimateViewSet,
     index, import_json, dashboard
 )
 
@@ -14,6 +15,9 @@ router = DefaultRouter()
 router.register(r'items', DataItemViewSet, basename='dataitem')
 router.register(r'categories', CategoryViewSet, basename='category')
 router.register(r'files', StorageFileViewSet, basename='storagefile')
+router.register(r'tags', TagViewSet, basename='tag')
+router.register(r'providers', StorageProviderViewSet, basename='storageprovider')
+router.register(r'costs', CostEstimateViewSet, basename='costestimate')
 
 # URL patterns
 urlpatterns = [

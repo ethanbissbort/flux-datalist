@@ -4,7 +4,10 @@ Handles API representation and validation for Category and DataItem models.
 """
 from typing import Dict, Any
 from rest_framework import serializers
-from .models import DataItem, Category, StorageFile
+from .models import (
+    DataItem, Category, StorageFile, Tag,
+    StorageProvider, CostEstimate
+)
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -179,3 +182,129 @@ class StorageFileUploadSerializer(serializers.ModelSerializer):
             )
 
         return value
+
+
+class TagSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Tag model.
+    Includes usage count for statistics.
+    """
+    usage_count = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
+    class Meta:
+        model = Tag
+        fields = [
+            'id', 'name', 'slug', 'description', 'color',
+            'category', 'category_name', 'usage_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['slug', 'created_at', 'updated_at']
+
+    def get_usage_count(self, obj: Tag) -> int:
+        """Returns number of data items using this tag."""
+        return obj.get_usage_count()
+
+
+class StorageProviderSerializer(serializers.ModelSerializer):
+    """
+    Serializer for StorageProvider model.
+    Includes cost calculation methods.
+    """
+    provider_type_display = serializers.CharField(
+        source='get_provider_type_display',
+        read_only=True
+    )
+    estimate_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = StorageProvider
+        fields = [
+            'id', 'name', 'provider_type', 'provider_type_display',
+            'cost_per_gb_monthly', 'retrieval_cost_per_gb',
+            'api_cost_per_1000_requests', 'description', 'url',
+            'is_active', 'estimate_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_estimate_count(self, obj: StorageProvider) -> int:
+        """Returns number of cost estimates using this provider."""
+        return obj.cost_estimates.count()
+
+
+class CostEstimateSerializer(serializers.ModelSerializer):
+    """
+    Serializer for CostEstimate model.
+    Includes calculated costs and comparisons.
+    """
+    data_item_name = serializers.CharField(source='data_item.name', read_only=True)
+    provider_name = serializers.CharField(source='provider.name', read_only=True)
+    provider_type = serializers.CharField(source='provider.get_provider_type_display', read_only=True)
+    total_first_year_cost = serializers.SerializerMethodField()
+    cost_comparison = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CostEstimate
+        fields = [
+            'id', 'data_item', 'data_item_name', 'provider', 'provider_name',
+            'provider_type', 'estimated_size_gb', 'monthly_storage_cost',
+            'annual_storage_cost', 'estimated_retrieval_cost',
+            'actual_monthly_cost', 'actual_retrieval_cost',
+            'bandwidth_cost', 'api_request_cost', 'total_first_year_cost',
+            'cost_comparison', 'is_active', 'notes',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = [
+            'monthly_storage_cost', 'annual_storage_cost',
+            'estimated_retrieval_cost', 'created_at', 'updated_at'
+        ]
+
+    def get_total_first_year_cost(self, obj: CostEstimate) -> float:
+        """Calculate total first year cost."""
+        return obj.get_total_first_year_cost()
+
+    def get_cost_comparison(self, obj: CostEstimate):
+        """Get comparison between estimated and actual costs."""
+        return obj.get_cost_comparison()
+
+
+class DataItemWithTagsSerializer(serializers.ModelSerializer):
+    """
+    Enhanced DataItem serializer with tag information.
+    """
+    category_detail = CategorySerializer(source='category', read_only=True)
+    tags = TagSerializer(source='tag_set', many=True, read_only=True)
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        source='tag_set',
+        many=True,
+        queryset=Tag.objects.all(),
+        write_only=True,
+        required=False
+    )
+    size_display = serializers.CharField(source='get_size_display', read_only=True)
+
+    class Meta:
+        model = DataItem
+        fields = [
+            'id', 'name', 'category', 'category_detail', 'subcategory',
+            'description', 'examples', 'size_estimate_gb', 'size_display',
+            'tags', 'tag_ids', 'source_url', 'notes', 'priority', 'status',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+
+    def create(self, validated_data):
+        """Create DataItem with tags."""
+        tags = validated_data.pop('tag_set', [])
+        instance = super().create(validated_data)
+        if tags:
+            instance.tag_set.set(tags)
+        return instance
+
+    def update(self, instance, validated_data):
+        """Update DataItem with tags."""
+        tags = validated_data.pop('tag_set', None)
+        instance = super().update(instance, validated_data)
+        if tags is not None:
+            instance.tag_set.set(tags)
+        return instance

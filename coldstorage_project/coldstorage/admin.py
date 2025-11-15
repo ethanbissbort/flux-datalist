@@ -7,7 +7,10 @@ from django.contrib import admin
 from django.db.models import QuerySet, Sum
 from django.http import HttpRequest
 from django.utils.html import format_html
-from .models import Category, DataItem, StorageFile
+from .models import (
+    Category, DataItem, StorageFile, Tag,
+    StorageProvider, CostEstimate
+)
 
 
 @admin.register(Category)
@@ -294,6 +297,137 @@ class StorageFileAdmin(admin.ModelAdmin):
                 level='warning'
             )
     calculate_checksums.short_description = 'Calculate checksums'
+
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    """Enhanced admin for Tag model."""
+
+    list_display = ('name', 'color_badge', 'category', 'usage_count_display', 'created_at')
+    list_filter = ('category', 'created_at')
+    search_fields = ('name', 'description')
+    ordering = ('name',)
+    prepopulated_fields = {'slug': ('name',)}
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'slug', 'description', 'color', 'category')
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at', 'updated_at')
+
+    def color_badge(self, obj: Tag) -> str:
+        """Display tag with its color."""
+        return format_html(
+            '<span style="background-color: {}; color: white; padding: 3px 10px; '
+            'border-radius: 3px;">{}</span>',
+            obj.color, obj.name
+        )
+    color_badge.short_description = 'Tag'
+
+    def usage_count_display(self, obj: Tag) -> int:
+        """Display number of items using this tag."""
+        return obj.get_usage_count()
+    usage_count_display.short_description = 'Used by'
+    usage_count_display.admin_order_field = 'data_items__count'
+
+
+@admin.register(StorageProvider)
+class StorageProviderAdmin(admin.ModelAdmin):
+    """Enhanced admin for StorageProvider model."""
+
+    list_display = (
+        'name', 'provider_type', 'cost_per_gb_monthly',
+        'retrieval_cost_per_gb', 'is_active', 'estimate_count_display'
+    )
+    list_filter = ('provider_type', 'is_active', 'created_at')
+    search_fields = ('name', 'description')
+    ordering = ('name',)
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields': ('name', 'provider_type', 'description', 'url', 'is_active')
+        }),
+        ('Pricing', {
+            'fields': (
+                'cost_per_gb_monthly', 'retrieval_cost_per_gb',
+                'api_cost_per_1000_requests'
+            )
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = ('created_at', 'updated_at')
+
+    def estimate_count_display(self, obj: StorageProvider) -> int:
+        """Display number of cost estimates."""
+        return obj.cost_estimates.count()
+    estimate_count_display.short_description = 'Estimates'
+
+
+@admin.register(CostEstimate)
+class CostEstimateAdmin(admin.ModelAdmin):
+    """Enhanced admin for CostEstimate model."""
+
+    list_display = (
+        'data_item', 'provider', 'estimated_size_gb',
+        'monthly_storage_cost', 'annual_storage_cost',
+        'is_active', 'created_at'
+    )
+    list_filter = ('provider', 'is_active', 'created_at')
+    search_fields = ('data_item__name', 'provider__name', 'notes')
+    ordering = ('-created_at',)
+
+    fieldsets = (
+        ('Estimate Details', {
+            'fields': ('data_item', 'provider', 'estimated_size_gb', 'is_active')
+        }),
+        ('Estimated Costs', {
+            'fields': (
+                'monthly_storage_cost', 'annual_storage_cost',
+                'estimated_retrieval_cost'
+            )
+        }),
+        ('Actual Costs', {
+            'fields': ('actual_monthly_cost', 'actual_retrieval_cost')
+        }),
+        ('Additional Costs', {
+            'fields': ('bandwidth_cost', 'api_request_cost'),
+            'classes': ('collapse',)
+        }),
+        ('Notes', {
+            'fields': ('notes',)
+        }),
+        ('Metadata', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    readonly_fields = (
+        'monthly_storage_cost', 'annual_storage_cost',
+        'estimated_retrieval_cost', 'created_at', 'updated_at'
+    )
+
+    actions = ['recalculate_costs']
+
+    def recalculate_costs(self, request: HttpRequest, queryset: QuerySet) -> None:
+        """Recalculate costs for selected estimates."""
+        updated = 0
+        for estimate in queryset:
+            estimate.calculate_costs()
+            estimate.save()
+            updated += 1
+        self.message_user(request, f'Recalculated costs for {updated} estimate(s).')
+    recalculate_costs.short_description = 'Recalculate costs'
 
 
 # Customize admin site header and title

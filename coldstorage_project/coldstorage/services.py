@@ -8,7 +8,7 @@ from io import BytesIO, StringIO
 from typing import Dict, List, Tuple, Any, Optional
 from django.core.files.uploadedfile import UploadedFile
 from django.db.models import QuerySet
-from .models import Category, DataItem
+from .models import Category, DataItem, Tag
 
 
 class ImportResult:
@@ -413,3 +413,145 @@ class ExportService:
             })
 
         return output.getvalue()
+
+
+class BatchOperationService:
+    """Service for batch operations on data items."""
+
+    @staticmethod
+    def bulk_update_status(queryset: QuerySet[DataItem], status: str) -> int:
+        """Bulk update status for data items."""
+        return queryset.update(status=status)
+
+    @staticmethod
+    def bulk_update_priority(queryset: QuerySet[DataItem], priority: str) -> int:
+        """Bulk update priority for data items."""
+        return queryset.update(priority=priority)
+
+    @staticmethod
+    def bulk_update_category(queryset: QuerySet[DataItem], category_id: int) -> int:
+        """Bulk update category for data items."""
+        return queryset.update(category_id=category_id)
+
+    @staticmethod
+    def bulk_add_tags(queryset: QuerySet[DataItem], tag_ids: List[int]) -> Dict[str, int]:
+        """
+        Bulk add tags to data items.
+        Returns dict with updated and error counts.
+        """
+        tags = Tag.objects.filter(id__in=tag_ids)
+        updated = 0
+
+        for item in queryset:
+            item.tag_set.add(*tags)
+            updated += 1
+
+        return {'updated': updated, 'tags_added': len(tags)}
+
+    @staticmethod
+    def bulk_remove_tags(queryset: QuerySet[DataItem], tag_ids: List[int]) -> Dict[str, int]:
+        """
+        Bulk remove tags from data items.
+        Returns dict with updated and error counts.
+        """
+        tags = Tag.objects.filter(id__in=tag_ids)
+        updated = 0
+
+        for item in queryset:
+            item.tag_set.remove(*tags)
+            updated += 1
+
+        return {'updated': updated, 'tags_removed': len(tags)}
+
+    @staticmethod
+    def bulk_set_tags(queryset: QuerySet[DataItem], tag_ids: List[int]) -> Dict[str, int]:
+        """
+        Bulk set tags for data items (replaces existing tags).
+        Returns dict with updated count.
+        """
+        tags = Tag.objects.filter(id__in=tag_ids)
+        updated = 0
+
+        for item in queryset:
+            item.tag_set.set(tags)
+            updated += 1
+
+        return {'updated': updated, 'tags_set': len(tags)}
+
+    @staticmethod
+    def bulk_delete(queryset: QuerySet[DataItem]) -> int:
+        """
+        Bulk delete data items.
+        Returns count of deleted items.
+        """
+        count, _ = queryset.delete()
+        return count
+
+    @classmethod
+    def get_batch_operation_summary(cls, operation: str, queryset: QuerySet[DataItem], **kwargs) -> Dict[str, Any]:
+        """
+        Execute a batch operation and return summary.
+        """
+        initial_count = queryset.count()
+
+        if operation == 'update_status':
+            updated = cls.bulk_update_status(queryset, kwargs['status'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'updated': updated,
+                'status': kwargs['status']
+            }
+
+        elif operation == 'update_priority':
+            updated = cls.bulk_update_priority(queryset, kwargs['priority'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'updated': updated,
+                'priority': kwargs['priority']
+            }
+
+        elif operation == 'update_category':
+            updated = cls.bulk_update_category(queryset, kwargs['category_id'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'updated': updated,
+                'category_id': kwargs['category_id']
+            }
+
+        elif operation == 'add_tags':
+            result = cls.bulk_add_tags(queryset, kwargs['tag_ids'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                **result
+            }
+
+        elif operation == 'remove_tags':
+            result = cls.bulk_remove_tags(queryset, kwargs['tag_ids'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                **result
+            }
+
+        elif operation == 'set_tags':
+            result = cls.bulk_set_tags(queryset, kwargs['tag_ids'])
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                **result
+            }
+
+        elif operation == 'delete':
+            deleted = cls.bulk_delete(queryset)
+            return {
+                'operation': operation,
+                'initial_count': initial_count,
+                'deleted': deleted
+            }
+
+        else:
+            raise ValueError(f"Unknown batch operation: {operation}")
