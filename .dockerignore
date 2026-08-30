@@ -1,0 +1,50 @@
+# Keeps the build context small and keeps local state out of the image.
+#
+# NOTE: excluding .git is deliberate and load bearing: settings.py treats an
+# unconfigured *source checkout* (a .git working tree) as a developer machine
+# and defaults DEBUG on there. The image has no .git, so it always defaults to
+# the hardened configuration and refuses to start without DJANGO_SECRET_KEY.
+.git
+.gitattributes
+.gitignore
+.github/
+
+# Byte-compiled / cached files
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+htmlcov/
+.coverage
+.coverage.*
+
+# Local virtualenvs and environment files
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.*
+
+# Local database, logs, collected static and user uploads: these belong to the
+# running container (volumes), never to the image.
+*.sqlite3
+*.sqlite3-journal
+db.sqlite3
+*.log
+coldstorage_project/staticfiles/
+coldstorage_project/media/
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml
+docker-compose.*.yml
+.dockerignore
+
+# Editor / OS noise
+.idea/
+.vscode/
+.DS_Store

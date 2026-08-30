@@ -1,10 +1,40 @@
-version: "3.9"
+# Compose v2: the top-level `version` key is obsolete and is intentionally absent.
+#
+# Defaults here are the local development ones (DJANGO_DEBUG=1), so
+# `docker compose up --build` works out of the box. For anything real, set
+# DJANGO_DEBUG=0 and export a DJANGO_SECRET_KEY - with debug off the container
+# refuses to start without one.
+#
+#   DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))') \
+#   DJANGO_DEBUG=0 DJANGO_ALLOWED_HOSTS=coldstorage.example.com \
+#   docker compose up --build -d
+
 services:
   web:
     build: .
+    image: coldstorage:latest
+    # No bind mount of the source tree: it would shadow the dependencies,
+    # collected static files and the non-root ownership the image sets up.
     ports:
       - "8000:8000"
-    volumes:
-      - .:/app
     environment:
-      - DEBUG=True
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-1}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:-}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}"
+      # sqlite by default, on a named volume so it survives `compose down`.
+      # For PostgreSQL: DJANGO_DB_ENGINE=postgresql plus DJANGO_DB_NAME/USER/
+      # PASSWORD/HOST/PORT (psycopg is already in the image).
+      DJANGO_DB_ENGINE: "${DJANGO_DB_ENGINE:-sqlite3}"
+      DJANGO_DB_NAME: "${DJANGO_DB_NAME:-/app/data/db.sqlite3}"
+      DJANGO_DB_USER: "${DJANGO_DB_USER:-}"
+      DJANGO_DB_PASSWORD: "${DJANGO_DB_PASSWORD:-}"
+      DJANGO_DB_HOST: "${DJANGO_DB_HOST:-}"
+      DJANGO_DB_PORT: "${DJANGO_DB_PORT:-}"
+    volumes:
+      - coldstorage-data:/app/data
+      - coldstorage-media:/app/coldstorage_project/media
+    restart: unless-stopped
+
+volumes:
+  coldstorage-data:
+  coldstorage-media:

@@ -4,6 +4,14 @@
 **Date**: November 15, 2025
 **Branch**: `claude/create-claude-md-01RNqDFeeRCkdm1oWB6CQegT`
 
+
+> **Status note (2026-08-30).** A full repository audit ([`AUDIT.md`](AUDIT.md)) found that much of
+> what this document marks ✅ complete did not actually work at runtime: a field rename
+> (`DataItem.tags` → `tags_old` / `tag_set`) was never propagated to nine call sites, and 12 of 25
+> exercised entry points returned HTTP 500 or failed silently. Those defects have since been fixed
+> and covered by regression tests in `coldstorage/tests.py`. Treat the ✅ markers below as
+> "implemented and now verified", and the audit as the authoritative record of what was broken.
+
 ---
 
 ## Overview

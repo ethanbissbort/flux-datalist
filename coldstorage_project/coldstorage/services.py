@@ -7,6 +7,7 @@ import json
 from io import BytesIO, StringIO
 from typing import Dict, List, Tuple, Any, Optional
 from django.core.files.uploadedfile import UploadedFile
+from django.db import transaction
 from django.db.models import QuerySet
 from .models import Category, DataItem, Tag
 
@@ -99,8 +100,13 @@ class JSONImportService:
 
     @staticmethod
     def create_data_item_from_entry(entry: Dict[str, Any], category: Category) -> DataItem:
-        """Create a DataItem from a JSON entry."""
-        return DataItem.objects.create(
+        """
+        Create a DataItem from a JSON entry.
+
+        ``tags`` is not a model field — it is a many-to-many relation that can
+        only be populated after the row exists, so it is applied separately.
+        """
+        item = DataItem.objects.create(
             name=entry.get('name', '').strip(),
             category=category,
             description=entry.get('description', ''),
@@ -108,13 +114,15 @@ class JSONImportService:
             size_estimate_gb=JSONImportService.parse_size_estimate(
                 entry.get('size_estimate_gb')
             ),
-            tags=entry.get('tags', ''),
             source_url=entry.get('source_url', ''),
             notes=entry.get('notes', ''),
             subcategory=entry.get('subcategory', ''),
             priority=entry.get('priority', 'medium'),
             status=entry.get('status', 'planned'),
         )
+
+        item.add_tags_from_string(entry.get('tags', ''))
+        return item
 
     @classmethod
     def import_from_json(cls, file: UploadedFile) -> ImportResult:
@@ -136,7 +144,9 @@ class JSONImportService:
             result.add_error(error)
             return result
 
-        # Process each entry
+        # Process each entry. Each one is its own atomic unit: a bad row rolls
+        # back only itself (including any category it auto-created), instead of
+        # leaving a half-written item or an orphaned category behind.
         for i, entry in enumerate(data):
             try:
                 if not isinstance(entry, dict):
@@ -149,12 +159,14 @@ class JSONImportService:
                     result.add_error(f'Entry {i+1}: Name is required')
                     continue
 
-                # Get or create category
-                category_name = entry.get('category', 'Uncategorized')
-                category = cls.get_or_create_category(category_name)
+                with transaction.atomic():
+                    # Get or create category
+                    category_name = entry.get('category', 'Uncategorized')
+                    category = cls.get_or_create_category(category_name)
 
-                # Create data item
-                cls.create_data_item_from_entry(entry, category)
+                    # Create data item
+                    cls.create_data_item_from_entry(entry, category)
+
                 result.increment_imported()
 
             except Exception as e:
@@ -169,14 +181,18 @@ class DataItemService:
 
     @staticmethod
     def create_from_form_data(form_data: Dict[str, Any]) -> DataItem:
-        """Create a DataItem from form data."""
+        """
+        Create a DataItem from form data.
+
+        As with the JSON importer, ``tags`` is a relation and is applied after
+        the row is created rather than passed to ``create()``.
+        """
         category = Category.objects.get(id=form_data['category_id'])
 
-        return DataItem.objects.create(
+        item = DataItem.objects.create(
             name=form_data.get('name', ''),
             category=category,
             size_estimate_gb=form_data.get('size_estimate_gb') or None,
-            tags=form_data.get('tags', ''),
             description=form_data.get('description', ''),
             subcategory=form_data.get('subcategory', ''),
             source_url=form_data.get('source_url', ''),
@@ -185,6 +201,9 @@ class DataItemService:
             priority=form_data.get('priority', 'medium'),
             status=form_data.get('status', 'planned'),
         )
+
+        item.add_tags_from_string(form_data.get('tags', ''))
+        return item
 
     @staticmethod
     def get_statistics() -> Dict[str, Any]:
@@ -246,7 +265,8 @@ class ExportService:
             'examples': item.examples,
             'size_estimate_gb': item.size_estimate_gb,
             'size_display': item.get_size_display(),
-            'tags': item.tags,
+            # 'tags' is a relation, not a column: render the tag names.
+            'tags': item.get_tags_display(),
             'source_url': item.source_url,
             'notes': item.notes,
             'priority': item.priority,
@@ -263,6 +283,7 @@ class ExportService:
         Export queryset to JSON format.
         Returns JSON string.
         """
+        queryset = queryset.prefetch_related('tag_set')
         data = [cls._prepare_item_data(item) for item in queryset]
         return json.dumps(data, indent=2, ensure_ascii=False)
 
@@ -285,7 +306,7 @@ class ExportService:
         writer = csv.DictWriter(output, fieldnames=fieldnames)
         writer.writeheader()
 
-        for item in queryset:
+        for item in queryset.prefetch_related('tag_set'):
             writer.writerow(cls._prepare_item_data(item))
 
         return output.getvalue()
@@ -330,7 +351,7 @@ class ExportService:
             cell.alignment = Alignment(horizontal="center", vertical="center")
 
         # Write data
-        for row_num, item in enumerate(queryset, 2):
+        for row_num, item in enumerate(queryset.prefetch_related('tag_set'), 2):
             data = cls._prepare_item_data(item)
             ws.cell(row=row_num, column=1, value=data['id'])
             ws.cell(row=row_num, column=2, value=data['name'])
@@ -356,11 +377,8 @@ class ExportService:
             max_length = 0
             column_letter = column[0].column_letter
             for cell in column:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(str(cell.value))
-                except:
-                    pass
+                if cell.value is not None:
+                    max_length = max(max_length, len(str(cell.value)))
             adjusted_width = min(max_length + 2, 50)
             ws.column_dimensions[column_letter].width = adjusted_width
 
@@ -482,16 +500,45 @@ class BatchOperationService:
     def bulk_delete(queryset: QuerySet[DataItem]) -> int:
         """
         Bulk delete data items.
-        Returns count of deleted items.
+
+        Returns the number of DataItems deleted. ``QuerySet.delete()`` returns
+        the total across every cascaded model (StorageFile, CostEstimate, the
+        tag through-table), which would over-report what the caller asked to
+        delete, so read the per-model breakdown instead.
         """
-        count, _ = queryset.delete()
-        return count
+        _, per_model = queryset.delete()
+        return per_model.get(DataItem._meta.label, 0)
+
+    #: Parameter each operation requires, so a missing one is reported as bad
+    #: input rather than surfacing as a KeyError deep in the call.
+    REQUIRED_PARAMS = {
+        'update_status': 'status',
+        'update_priority': 'priority',
+        'update_category': 'category_id',
+        'add_tags': 'tag_ids',
+        'remove_tags': 'tag_ids',
+        'set_tags': 'tag_ids',
+        'delete': None,
+    }
 
     @classmethod
     def get_batch_operation_summary(cls, operation: str, queryset: QuerySet[DataItem], **kwargs) -> Dict[str, Any]:
         """
         Execute a batch operation and return summary.
+
+        Note the caller must not forward the raw request body here: it still
+        contains 'operation', which is already bound positionally and would
+        raise TypeError for a duplicate argument.
         """
+        if operation not in cls.REQUIRED_PARAMS:
+            raise ValueError(f"Unknown batch operation: {operation}")
+
+        required = cls.REQUIRED_PARAMS[operation]
+        if required is not None and kwargs.get(required) is None:
+            raise ValueError(
+                f"Operation '{operation}' requires the '{required}' parameter."
+            )
+
         initial_count = queryset.count()
 
         if operation == 'update_status':

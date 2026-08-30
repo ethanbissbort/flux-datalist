@@ -8,13 +8,29 @@ from .models import DataItem, Category
 
 
 class DataItemForm(forms.ModelForm):
-    """Form for creating and editing DataItem instances."""
+    """
+    Form for creating and editing DataItem instances.
+
+    The free-text ``tags`` input writes to the ``tag_set`` relation — the same
+    place the API writes — rather than to the deprecated ``tags_old`` column.
+    Otherwise the web UI and the API maintain two divergent sets of tags.
+    """
+
+    tags = forms.CharField(
+        required=False,
+        label='Tags',
+        help_text='Comma-separated. Tags are created if they do not exist.',
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Comma-separated tags'
+        })
+    )
 
     class Meta:
         model = DataItem
         fields = [
             'name', 'category', 'subcategory', 'description', 'examples',
-            'size_estimate_gb', 'tags_old', 'source_url', 'notes',
+            'size_estimate_gb', 'source_url', 'notes',
             'priority', 'status'
         ]
         widgets = {
@@ -43,10 +59,6 @@ class DataItemForm(forms.ModelForm):
                 'step': '0.01',
                 'min': '0'
             }),
-            'tags_old': forms.TextInput(attrs={
-                'class': 'form-control',
-                'placeholder': 'Comma-separated tags'
-            }),
             'source_url': forms.URLInput(attrs={
                 'class': 'form-control',
                 'placeholder': 'https://example.com'
@@ -59,6 +71,26 @@ class DataItemForm(forms.ModelForm):
             'priority': forms.Select(attrs={'class': 'form-control'}),
             'status': forms.Select(attrs={'class': 'form-control'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Pre-populate the tag input when editing an existing item.
+        if self.instance.pk and not self.is_bound:
+            self.fields['tags'].initial = self.instance.get_tags_display()
+
+    def clean_tags(self) -> str:
+        """Clean and normalize the comma-separated tag string."""
+        tags = self.cleaned_data.get('tags', '')
+        if tags:
+            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
+            return ', '.join(tag_list)
+        return tags
+
+    def _save_m2m(self):
+        """Apply the typed tags after the instance and its relations exist."""
+        super()._save_m2m()
+        self.instance.tag_set.clear()
+        self.instance.add_tags_from_string(self.cleaned_data.get('tags', ''))
 
     def clean_name(self) -> str:
         """Ensure name is not empty or just whitespace."""
@@ -73,15 +105,6 @@ class DataItemForm(forms.ModelForm):
         if size is not None and size < 0:
             raise forms.ValidationError('Size estimate cannot be negative.')
         return size
-
-    def clean_tags_old(self) -> str:
-        """Clean and normalize tags."""
-        tags = self.cleaned_data.get('tags_old', '')
-        if tags:
-            # Remove extra whitespace and normalize commas
-            tag_list = [tag.strip() for tag in tags.split(',') if tag.strip()]
-            return ', '.join(tag_list)
-        return tags
 
 
 class CategoryForm(forms.ModelForm):
@@ -111,19 +134,20 @@ class CategoryForm(forms.ModelForm):
         return name
 
     def clean(self) -> Dict[str, Any]:
-        """Validate that parent doesn't create a circular reference."""
+        """
+        Validate that parent doesn't create a circular reference.
+
+        Delegates to the model so the form, the serializer and the model all
+        share one bounded implementation. The walk this used to do inline was
+        unbounded and would itself hang on an already-cyclic row.
+        """
         cleaned_data = super().clean()
         parent = cleaned_data.get('parent')
 
-        if parent and self.instance.pk:
-            # Check if setting this parent would create a cycle
-            current = parent
-            while current:
-                if current.pk == self.instance.pk:
-                    raise forms.ValidationError(
-                        'Cannot set parent: would create a circular reference.'
-                    )
-                current = current.parent
+        if parent and self.instance.would_create_cycle(parent):
+            raise forms.ValidationError(
+                'Cannot set parent: would create a circular reference.'
+            )
 
         return cleaned_data
 
@@ -206,8 +230,9 @@ class DataItemFilterForm(forms.Form):
             from django.db.models import Q
             queryset = queryset.filter(
                 Q(name__icontains=search) |
+                Q(tag_set__name__icontains=search) |
                 Q(tags_old__icontains=search) |
                 Q(description__icontains=search)
-            )
+            ).distinct()
 
         return queryset

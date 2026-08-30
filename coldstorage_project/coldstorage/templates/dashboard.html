@@ -2,131 +2,443 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Cold Storage Dashboard</title>
-  <script src="https://unpkg.com/vue@3"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <!--
+    CDN assets are pinned to exact versions and guarded with Subresource Integrity
+    hashes computed from the actual bytes served by jsdelivr (sha384, base64).
+    Vue must be the *global* build (vue.global.prod.js) because this page uses an
+    in-DOM template that has to be compiled at runtime.
+  -->
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+        crossorigin="anonymous">
+  <script src="https://cdn.jsdelivr.net/npm/vue@3.4.21/dist/vue.global.prod.js"
+          integrity="sha384-6pS1WSZJY7wOk6qQTa9C9U2W1/qzqL7iYoMil7qn9KFeN5fZDAwIExgCd7U5AH+X"
+          crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"
+          integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
+          crossorigin="anonymous"></script>
+  <style>
+    [v-cloak] { display: none; }
+    .stat-card .stat-value { font-size: 1.75rem; font-weight: 600; line-height: 1.1; }
+    .stat-card .stat-label { font-size: .75rem; letter-spacing: .04em; }
+  </style>
 </head>
 <body class="container py-4">
 
-  <div id="app">
-    <h1>📦 Cold Storage Dashboard</h1>
+  <h1 class="mb-1">Cold Storage Dashboard</h1>
+  <p class="text-muted mb-4">
+    The summary below is rendered by the server and is always correct.
+    The interactive tables and chart are loaded from <code>/api/items/</code>.
+    <a href="{% url 'index' %}">Back to the checklist</a>
+  </p>
 
-    <!-- Filters -->
-    <div class="row g-3 my-3">
-      <div class="col-md-4">
-        <input v-model="search" type="text" class="form-control" placeholder="Search by name or tags...">
+  <!--
+    Server-rendered summary. These are DJANGO context variables from the
+    dashboard() view, so this whole region must stay OUTSIDE any verbatim block.
+    It also means the page is useful before (or instead of) the API call.
+  -->
+  <section class="mb-4">
+    <div class="row g-3">
+      <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="stat-label text-uppercase text-muted">Total items</div>
+            <div class="stat-value">{{ total_items }}</div>
+          </div>
+        </div>
       </div>
-      <div class="col-md-3">
-        <select v-model="selectedCategory" class="form-select">
-          <option value="">All Categories</option>
-          <option v-for="cat in categories" :value="cat">{{ cat }}</option>
-        </select>
+      <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="stat-label text-uppercase text-muted">Categories</div>
+            <div class="stat-value">{{ total_categories }}</div>
+          </div>
+        </div>
       </div>
-      <div class="col-md-3">
-        <select v-model="sortKey" class="form-select">
-          <option value="name">Sort by Name</option>
-          <option value="size_estimate_gb">Sort by Size</option>
-          <option value="category">Sort by Category</option>
-        </select>
+      <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="stat-label text-uppercase text-muted">Total size (GB)</div>
+            <div class="stat-value">{{ total_size_gb|default_if_none:0|floatformat:2 }}</div>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-3">
+        <div class="card stat-card h-100 shadow-sm">
+          <div class="card-body">
+            <div class="stat-label text-uppercase text-muted">Average size (GB)</div>
+            <div class="stat-value">{{ average_size_gb|default_if_none:0|floatformat:2 }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Data Table -->
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>Name</th><th>Category</th><th>Size (GB)</th><th>Tags</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="item in filteredAndSortedItems">
-          <td>{{ item.name }}</td>
-          <td>{{ item.category }}</td>
-          <td>{{ item.size_estimate_gb }}</td>
-          <td>{{ item.tags }}</td>
-        </tr>
-      </tbody>
-    </table>
-
-    <!-- Disk Usage Chart -->
-    <div class="mt-5">
-      <h3>📊 Disk Usage by Category</h3>
-      <canvas id="usageChart" width="600" height="300"></canvas>
+    <div class="row g-3 mt-1">
+      <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="card-title text-uppercase text-muted">Status breakdown</h6>
+            {% for row in status_breakdown %}
+              <span class="badge bg-primary-subtle text-primary-emphasis border border-primary-subtle me-1 mb-1">
+                {{ row.status }}: {{ row.count }}
+              </span>
+            {% empty %}
+              <p class="text-muted mb-0">No items yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card h-100 shadow-sm">
+          <div class="card-body">
+            <h6 class="card-title text-uppercase text-muted">Priority breakdown</h6>
+            {% for row in priority_breakdown %}
+              <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle me-1 mb-1">
+                {{ row.priority }}: {{ row.count }}
+              </span>
+            {% empty %}
+              <p class="text-muted mb-0">No items yet.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
     </div>
 
-    <!-- Grouped View -->
-    <div v-for="(group, name) in groupedItems" :key="name" class="mb-4">
-    <h4>{{ name }}</h4>
-    <table class="table table-sm table-bordered">
-        <thead><tr><th>Name</th><th>Subcategory</th><th>Size (GB)</th><th>Tags</th></tr></thead>
-        <tbody>
-        <tr v-for="item in group">
-            <td>{{ item.name }}</td>
-            <td>{{ item.subcategory }}</td>
-            <td>{{ item.size_estimate_gb }}</td>
-            <td>
-            <span v-for="tag in item.tags.split(',')" class="badge rounded-pill bg-secondary me-1"
-                    style="cursor:pointer" @click="toggleTagFilter(tag.trim())">
-                {{ tag.trim() }}
-            </span>
-            </td>
-        </tr>
-        </tbody>
-    </table>
+    <div class="card shadow-sm mt-3">
+      <div class="card-body">
+        <h6 class="card-title text-uppercase text-muted">Per-category totals (server-rendered)</h6>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr><th>Category</th><th class="text-end">Items</th><th class="text-end">Total size (GB)</th></tr>
+            </thead>
+            <tbody>
+              {% for row in category_stats %}
+                <tr>
+                  <td>{{ row.name }}</td>
+                  <td class="text-end">{{ row.item_count }}</td>
+                  <td class="text-end">{{ row.total_size|default_if_none:0|floatformat:2 }}</td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-muted">No categories yet.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!--
+    Everything below is the Vue app. Django's template engine evaluates
+    double-brace interpolations server-side and would render them as empty
+    strings, so the whole Vue region sits inside a verbatim block. Django
+    context variables must NOT be placed inside it.
+  -->
+  <div id="app" v-cloak>
+  {% verbatim %}
+    <h2 class="h4 mt-4">Item explorer</h2>
+
+    <div v-if="loading" class="alert alert-info" role="status">Loading items from <code>/api/items/</code>&hellip;</div>
+
+    <div v-else-if="error" class="alert alert-danger" role="alert">
+      <strong>Could not load items from /api/items/.</strong>
+      <div class="small mt-1">{{ error }}</div>
+      <button type="button" class="btn btn-sm btn-outline-danger mt-2" @click="loadItems">Retry</button>
     </div>
 
+    <div v-else-if="items.length === 0" class="alert alert-warning" role="status">
+      The API returned no data items. Add one from the <a href="/">checklist page</a>.
+    </div>
 
+    <template v-else>
+      <p class="text-muted small">
+        Showing {{ filteredAndSortedItems.length }} of {{ items.length }} loaded item(s);
+        the API reports {{ apiCount }} in total.
+        <span v-if="truncated" class="text-danger">
+          Only the first {{ items.length }} could be loaded (too many pages) &mdash; results are incomplete.
+        </span>
+      </p>
+
+      <!-- Filters -->
+      <div class="row g-3 my-3">
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Search</label>
+          <input v-model="search" type="text" class="form-control" placeholder="Search by name or tags...">
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Category</label>
+          <select v-model="selectedCategory" class="form-select">
+            <option value="">All Categories</option>
+            <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label small text-muted">Sort</label>
+          <select v-model="sortKey" class="form-select">
+            <option value="name">Sort by Name</option>
+            <option value="size_estimate_gb">Sort by Size</option>
+            <option value="category">Sort by Category</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Active tag filters -->
+      <div v-if="activeTags.length" class="mb-3">
+        <span class="me-2 small text-muted">Filtering by tag (all of):</span>
+        <button v-for="tag in activeTags" :key="tag" type="button"
+                class="btn btn-sm btn-primary rounded-pill me-1 mb-1"
+                @click="toggleTagFilter(tag)">
+          {{ tag }} &times;
+        </button>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill mb-1"
+                @click="clearTagFilters">Clear tags</button>
+      </div>
+
+      <!-- Data Table -->
+      <div class="table-responsive">
+        <table class="table table-striped align-middle">
+          <thead>
+            <tr>
+              <th>Name</th><th>Category</th><th>Size (GB)</th>
+              <th>Status</th><th>Priority</th><th>Tags</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="item in filteredAndSortedItems" :key="item.id">
+              <td>{{ item.name }}</td>
+              <td>{{ item.category }}</td>
+              <td>{{ item.size_display }}</td>
+              <td><span class="badge bg-secondary">{{ item.status }}</span></td>
+              <td>{{ item.priority }}</td>
+              <td>
+                <span v-for="tag in item.tagsList" :key="tag"
+                      class="badge rounded-pill me-1"
+                      :class="activeTags.includes(tag) ? 'bg-primary' : 'bg-secondary'"
+                      style="cursor:pointer" @click="toggleTagFilter(tag)">{{ tag }}</span>
+                <span v-if="!item.tagsList.length" class="text-muted">&mdash;</span>
+              </td>
+            </tr>
+            <tr v-if="!filteredAndSortedItems.length">
+              <td colspan="6" class="text-center text-muted py-4">
+                No items match the current filters.
+                <button type="button" class="btn btn-sm btn-link" @click="resetFilters">Reset filters</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Disk Usage Chart -->
+      <div class="mt-5">
+        <h3 class="h5">Disk Usage by Category</h3>
+        <p class="text-muted small mb-2">Reflects the filters above. Items with no size estimate count as 0 GB.</p>
+        <canvas id="usageChart" width="600" height="300"></canvas>
+      </div>
+
+      <!-- Grouped View -->
+      <h3 class="h5 mt-5">By category</h3>
+      <div v-for="(group, name) in groupedItems" :key="name" class="mb-4">
+        <h4 class="h6">{{ name }} <span class="text-muted">({{ group.length }})</span></h4>
+        <div class="table-responsive">
+          <table class="table table-sm table-bordered">
+            <thead>
+              <tr><th>Name</th><th>Subcategory</th><th>Size (GB)</th><th>Tags</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="item in group" :key="item.id">
+                <td>{{ item.name }}</td>
+                <td>{{ item.subcategory || '—' }}</td>
+                <td>{{ item.size_display }}</td>
+                <td>
+                  <span v-for="tag in item.tagsList" :key="tag"
+                        class="badge rounded-pill me-1"
+                        :class="activeTags.includes(tag) ? 'bg-primary' : 'bg-secondary'"
+                        style="cursor:pointer" @click="toggleTagFilter(tag)">{{ tag }}</span>
+                  <span v-if="!item.tagsList.length" class="text-muted">&mdash;</span>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </template>
+  {% endverbatim %}
   </div>
 
+  {% verbatim %}
   <script>
+    // Held outside the component so Vue never makes the Chart.js instance reactive.
+    let chartInstance = null;
+
+    // /api/items/ is paginated (DRF PageNumberPagination, PAGE_SIZE=100), so the
+    // body is {count, next, previous, results}. Walk `next` to collect every page.
+    async function fetchAllItems(startUrl, maxPages) {
+      const collected = [];
+      let url = startUrl;
+      let pages = 0;
+      let count = null;
+
+      while (url && pages < maxPages) {
+        const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+        if (!res.ok) {
+          throw new Error('HTTP ' + res.status + ' ' + res.statusText + ' from ' + url);
+        }
+        const data = await res.json();
+
+        // Tolerate an un-paginated array in case pagination is ever turned off.
+        if (Array.isArray(data)) {
+          collected.push.apply(collected, data);
+          url = null;
+          if (count === null) count = data.length;
+        } else {
+          const results = Array.isArray(data.results) ? data.results : [];
+          collected.push.apply(collected, results);
+          if (count === null && typeof data.count === 'number') count = data.count;
+          url = data.next || null;
+        }
+        pages += 1;
+      }
+
+      return {
+        results: collected,
+        count: count === null ? collected.length : count,
+        truncated: Boolean(url)
+      };
+    }
+
+    function toNumberOrNull(value) {
+      if (value === null || value === undefined || value === '') return null;
+      const n = Number(value);
+      return Number.isFinite(n) ? n : null;
+    }
+
     const app = Vue.createApp({
       data() {
         return {
           search: '',
           selectedCategory: '',
           sortKey: 'size_estimate_gb',
-          items: [],  // filled dynamically
-          categories: []
+          activeTags: [],
+          items: [],
+          categories: [],
+          apiCount: 0,
+          truncated: false,
+          loading: true,
+          error: ''
         };
       },
       computed: {
         filteredAndSortedItems() {
-          let filtered = this.items.filter(item => {
-            const searchLower = this.search.toLowerCase();
-            return (
+          const searchLower = this.search.trim().toLowerCase();
+          const active = this.activeTags;
+
+          const filtered = this.items.filter((item) => {
+            const matchesSearch =
+              !searchLower ||
               item.name.toLowerCase().includes(searchLower) ||
-              item.tags.toLowerCase().includes(searchLower)
-            ) && (this.selectedCategory === '' || item.category === this.selectedCategory);
+              item.tags.toLowerCase().includes(searchLower);
+            const matchesCategory =
+              this.selectedCategory === '' || item.category === this.selectedCategory;
+            const matchesTags =
+              active.length === 0 || active.every((t) => item.tagsList.includes(t));
+            return matchesSearch && matchesCategory && matchesTags;
           });
 
+          const key = this.sortKey;
           return filtered.sort((a, b) => {
-            const key = this.sortKey;
-            return typeof a[key] === 'string'
-              ? a[key].localeCompare(b[key])
-              : b[key] - a[key];
+            if (key === 'size_estimate_gb') {
+              const av = a.size_estimate_gb;
+              const bv = b.size_estimate_gb;
+              // size_estimate_gb is nullable; sort nulls last instead of producing NaN.
+              if (av === null && bv === null) return a.name.localeCompare(b.name);
+              if (av === null) return 1;
+              if (bv === null) return -1;
+              return bv - av;
+            }
+            return String(a[key] === null || a[key] === undefined ? '' : a[key])
+              .localeCompare(String(b[key] === null || b[key] === undefined ? '' : b[key]));
           });
         },
         groupedItems() {
-            const grouped = {};
-            for (let item of this.filteredAndSortedItems) {
-            const key = `${item.category}`;
+          const grouped = {};
+          for (const item of this.filteredAndSortedItems) {
+            const key = item.category;
             if (!grouped[key]) grouped[key] = [];
             grouped[key].push(item);
-            }
-            return grouped;
+          }
+          return grouped;
         }
       },
       methods: {
+        toggleTagFilter(tag) {
+          const name = (tag || '').trim();
+          if (!name) return;
+          const at = this.activeTags.indexOf(name);
+          if (at === -1) {
+            this.activeTags.push(name);
+          } else {
+            this.activeTags.splice(at, 1);
+          }
+        },
+        clearTagFilters() {
+          this.activeTags = [];
+        },
+        resetFilters() {
+          this.search = '';
+          this.selectedCategory = '';
+          this.activeTags = [];
+        },
+        normalize(raw) {
+          // Contract of DataItemListSerializer: category is an int pk, so the
+          // human-readable name lives on category_name. Tags come as both a
+          // comma-joined string (tags) and an array (tags_list).
+          const tagsString = typeof raw.tags === 'string' ? raw.tags : '';
+          let tagsList = Array.isArray(raw.tags_list) ? raw.tags_list.slice() : null;
+          if (!tagsList) {
+            tagsList = tagsString.split(',').map((t) => t.trim()).filter(Boolean);
+          }
+          const size = toNumberOrNull(raw.size_estimate_gb);
+
+          return {
+            id: raw.id,
+            name: raw.name || '(unnamed)',
+            category: raw.category_name || 'Uncategorized',
+            categoryId: raw.category,
+            subcategory: raw.subcategory || '',
+            tags: tagsString || tagsList.join(', '),
+            tagsList: tagsList,
+            size_estimate_gb: size,
+            size_display: raw.size_display || (size === null ? 'Unknown' : String(size)),
+            status: raw.status || '',
+            priority: raw.priority || '',
+            updated_at: raw.updated_at || ''
+          };
+        },
         drawChart() {
-          const ctx = document.getElementById('usageChart').getContext('2d');
+          const canvas = document.getElementById('usageChart');
+          if (!canvas || typeof Chart === 'undefined') return;
+
           const usage = {};
-          for (const item of this.items) {
-            if (!usage[item.category]) usage[item.category] = 0;
-            usage[item.category] += parseFloat(item.size_estimate_gb || 0);
+          for (const item of this.filteredAndSortedItems) {
+            // size_estimate_gb may be null; treat missing estimates as 0 so the
+            // accumulator never becomes NaN.
+            const size = item.size_estimate_gb === null ? 0 : item.size_estimate_gb;
+            usage[item.category] = (usage[item.category] || 0) + size;
           }
 
-          new Chart(ctx, {
+          // Chart.js keeps a registry keyed by canvas; without destroy() every
+          // redraw leaks an instance and the old one keeps handling events.
+          if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+          }
+
+          chartInstance = new Chart(canvas.getContext('2d'), {
             type: 'bar',
             data: {
               labels: Object.keys(usage),
@@ -137,31 +449,47 @@
               }]
             },
             options: {
-              scales: {
-                y: { beginAtZero: true }
-              }
+              responsive: false,
+              animation: false,
+              scales: { y: { beginAtZero: true } }
             }
           });
+        },
+        async loadItems() {
+          this.loading = true;
+          this.error = '';
+          try {
+            const page = await fetchAllItems('/api/items/', 25);
+            this.items = page.results.map(this.normalize);
+            this.apiCount = page.count;
+            this.truncated = page.truncated;
+            this.categories = Array.from(new Set(this.items.map((i) => i.category))).sort();
+          } catch (err) {
+            this.items = [];
+            this.categories = [];
+            this.apiCount = 0;
+            this.error = (err && err.message) ? err.message : String(err);
+          } finally {
+            this.loading = false;
+            this.$nextTick(() => this.drawChart());
+          }
+        }
+      },
+      watch: {
+        // Redraw whenever the filtered set changes; drawChart() destroys the
+        // previous Chart instance first.
+        filteredAndSortedItems() {
+          this.$nextTick(() => this.drawChart());
         }
       },
       mounted() {
-        fetch('/api/items/')
-          .then(res => res.json())
-          .then(data => {
-            this.items = data.map(i => ({
-              name: i.name,
-              category: i.category.name,
-              tags: i.tags || '',
-              size_estimate_gb: i.size_estimate_gb || 0
-            }));
-            this.categories = [...new Set(this.items.map(i => i.category))].sort();
-            this.drawChart();
-          });
+        this.loadItems();
       }
     });
 
     app.mount('#app');
   </script>
+  {% endverbatim %}
 
 </body>
 </html>

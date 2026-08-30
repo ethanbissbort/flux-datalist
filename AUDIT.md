@@ -322,12 +322,14 @@ No test files, no `.github/workflows`, no `tox.ini`/`pytest.ini`/`Makefile`. Thi
 of Finding 1 — nine broken call sites across two feature commits, none caught. `manage.py check`
 passes clean, which makes the repo look healthier than it is; the failures only surface on request.
 
-`ALLOWED_HOSTS` also omits `testserver`, so the first test anyone writes with the Django test client
-gets `400 DisallowedHost` on every request until they notice.
+**Correction to an earlier draft of this finding:** it claimed `ALLOWED_HOSTS` omits `testserver`
+and that the first test written would therefore get `400 DisallowedHost`. That is wrong — Django's
+`setup_test_environment()` appends `testserver` automatically, so `manage.py test` is unaffected.
+The 400s seen while auditing came from driving the test client *outside* the test runner, which is
+an artifact of the audit harness, not a defect in the project.
 
-**Recommended fix:** add `testserver` to `ALLOWED_HOSTS` (or a test settings module), then a smoke
-test that GETs every registered route and asserts `< 400`. That single test catches 12 of the
-findings here.
+**Recommended fix:** a smoke test that GETs every registered route and asserts it does not 5xx.
+That single test catches most of the findings here.
 
 ### 15. Docker build is broken *(by inspection — no Docker daemon available in this environment)*
 

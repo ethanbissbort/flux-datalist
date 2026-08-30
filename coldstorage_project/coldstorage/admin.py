@@ -4,7 +4,7 @@ Provides enhanced admin interface for managing categories and data items.
 """
 from typing import Optional
 from django.contrib import admin
-from django.db.models import QuerySet, Sum
+from django.db.models import Count, QuerySet, Sum
 from django.http import HttpRequest
 from django.utils.html import format_html
 from .models import (
@@ -35,15 +35,24 @@ class CategoryAdmin(admin.ModelAdmin):
 
     readonly_fields = ('created_at', 'updated_at')
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Annotate the counts so the changelist costs one query, not 2N+1."""
+        return super().get_queryset(request).select_related('parent').annotate(
+            item_count_annotated=Count('data_items', distinct=True),
+            children_count_annotated=Count('children', distinct=True),
+        )
+
     def item_count(self, obj: Category) -> int:
         """Display number of items in this category."""
-        return obj.data_items.count()
+        return obj.item_count_annotated
     item_count.short_description = 'Items'
+    item_count.admin_order_field = 'item_count_annotated'
 
     def children_count(self, obj: Category) -> int:
         """Display number of child categories."""
-        return obj.children.count()
+        return obj.children_count_annotated
     children_count.short_description = 'Sub-categories'
+    children_count.admin_order_field = 'children_count_annotated'
 
 
 @admin.register(DataItem)
@@ -57,16 +66,22 @@ class DataItemAdmin(admin.ModelAdmin):
     list_filter = (
         'category', 'priority', 'status', 'created_at', 'updated_at'
     )
-    search_fields = ('name', 'tags', 'description', 'examples', 'notes')
+    # 'tags' is not a column on DataItem — search the related tag names and the
+    # legacy free-text column instead.
+    search_fields = (
+        'name', 'tag_set__name', 'tags_old', 'description', 'examples', 'notes',
+    )
     ordering = ('-updated_at', 'name')
     date_hierarchy = 'created_at'
+    filter_horizontal = ('tag_set',)
+    list_select_related = ('category',)
 
     fieldsets = (
         ('Basic Information', {
             'fields': ('name', 'category', 'subcategory', 'description')
         }),
         ('Storage Details', {
-            'fields': ('size_estimate_gb', 'examples', 'tags')
+            'fields': ('size_estimate_gb', 'examples', 'tag_set')
         }),
         ('Source Information', {
             'fields': ('source_url', 'notes')
@@ -195,7 +210,12 @@ class StorageFileAdmin(admin.ModelAdmin):
         'verification_error', 'created_at', 'updated_at'
     )
 
-    actions = ['verify_checksums', 'mark_as_verified', 'calculate_checksums']
+    # Deliberately no "mark as verified without checking" action: this is an
+    # archival integrity tool, and an action that stamps files 'verified' with
+    # no evidence recreates exactly the false-clean state that made a corrupt
+    # archive look healthy. Use verify_checksums (real check) or
+    # calculate_checksums (re-baseline a file you know is good).
+    actions = ['verify_checksums', 'calculate_checksums']
 
     def file_size_display(self, obj: StorageFile) -> str:
         """Display human-readable file size."""
@@ -268,13 +288,6 @@ class StorageFileAdmin(admin.ModelAdmin):
             )
     verify_checksums.short_description = 'Verify file checksums'
 
-    def mark_as_verified(self, request: HttpRequest, queryset: QuerySet) -> None:
-        """Mark selected files as verified without checking."""
-        from django.utils import timezone
-        updated = queryset.update(status='verified', last_verified_at=timezone.now())
-        self.message_user(request, f'{updated} file(s) marked as verified.')
-    mark_as_verified.short_description = 'Mark as Verified (no check)'
-
     def calculate_checksums(self, request: HttpRequest, queryset: QuerySet) -> None:
         """Calculate checksums for selected files."""
         calculated_count = 0
@@ -330,11 +343,19 @@ class TagAdmin(admin.ModelAdmin):
         )
     color_badge.short_description = 'Tag'
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet:
+        """Annotate the usage count so the column is sortable and cheap."""
+        return super().get_queryset(request).annotate(
+            usage_count=Count('data_items', distinct=True)
+        )
+
     def usage_count_display(self, obj: Tag) -> int:
         """Display number of items using this tag."""
-        return obj.get_usage_count()
+        return obj.usage_count
     usage_count_display.short_description = 'Used by'
-    usage_count_display.admin_order_field = 'data_items__count'
+    # Must name a real annotation — 'data_items__count' does not exist and
+    # errors as soon as anyone clicks the column header to sort.
+    usage_count_display.admin_order_field = 'usage_count'
 
 
 @admin.register(StorageProvider)
