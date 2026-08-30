@@ -29,12 +29,71 @@ class CategorySerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
     def get_children_count(self, obj: Category) -> int:
-        """Returns the number of direct child categories."""
-        return obj.children.count()
+        """
+        Returns the number of direct child categories.
+        Prefers the queryset annotation added by CategoryViewSet to avoid a
+        COUNT query per row.
+        """
+        annotated = getattr(obj, 'children_count_annotated', None)
+        return annotated if annotated is not None else obj.children.count()
 
     def get_item_count(self, obj: Category) -> int:
-        """Returns the number of data items in this category."""
-        return obj.data_items.count()
+        """
+        Returns the number of data items in this category.
+        Prefers the queryset annotation added by CategoryViewSet.
+        """
+        annotated = getattr(obj, 'item_count_annotated', None)
+        return annotated if annotated is not None else obj.data_items.count()
+
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Reject a parent assignment that would create a cycle.
+
+        CategoryForm performs this check for the web UI, but the API never
+        touches that form. Without this a client can persist A -> B -> A, and
+        every later read of the row spins forever in get_full_path().
+        """
+        parent = attrs.get('parent', serializers.empty)
+        if parent is serializers.empty:
+            return attrs
+
+        instance = self.instance
+        if instance is None:
+            # On create the row has no pk yet, so it cannot be part of a cycle.
+            return attrs
+
+        if instance.would_create_cycle(parent):
+            raise serializers.ValidationError({
+                'parent': 'Cannot set parent: would create a circular reference.'
+            })
+        return attrs
+
+
+class TagSerializer(serializers.ModelSerializer):
+    """
+    Serializer for Tag model.
+    Includes usage count for statistics.
+    """
+    usage_count = serializers.SerializerMethodField()
+    category_name = serializers.CharField(source='category.name', read_only=True)
+
+    class Meta:
+        model = Tag
+        fields = [
+            'id', 'name', 'slug', 'description', 'color',
+            'category', 'category_name', 'usage_count',
+            'created_at', 'updated_at'
+        ]
+        read_only_fields = ['slug', 'created_at', 'updated_at']
+
+    def get_usage_count(self, obj: Tag) -> int:
+        """
+        Returns number of data items using this tag.
+        Prefers the queryset annotation added by TagViewSet to avoid a COUNT
+        query per row.
+        """
+        annotated = getattr(obj, 'usage_count_annotated', None)
+        return annotated if annotated is not None else obj.get_usage_count()
 
 
 class DataItemListSerializer(serializers.ModelSerializer):
@@ -45,6 +104,7 @@ class DataItemListSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     category_path = serializers.CharField(source='category.get_full_path', read_only=True)
     size_display = serializers.CharField(source='get_size_display', read_only=True)
+    tags = serializers.CharField(source='get_tags_display', read_only=True)
     tags_list = serializers.ListField(source='get_tags_list', read_only=True)
 
     class Meta:
@@ -59,28 +119,53 @@ class DataItemListSerializer(serializers.ModelSerializer):
 class DataItemDetailSerializer(serializers.ModelSerializer):
     """
     Detailed serializer for single item views.
-    Includes all fields and computed properties.
+    Includes the nested category, the item's tags, and computed properties.
     """
     category_detail = CategorySerializer(source='category', read_only=True)
     size_display = serializers.CharField(source='get_size_display', read_only=True)
+    tags = serializers.CharField(source='get_tags_display', read_only=True)
     tags_list = serializers.ListField(source='get_tags_list', read_only=True)
+    tags_detail = TagSerializer(source='tag_set', many=True, read_only=True)
 
     class Meta:
         model = DataItem
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'category', 'category_detail', 'subcategory',
+            'description', 'examples', 'size_estimate_gb', 'size_display',
+            'tags', 'tags_list', 'tags_detail', 'source_url', 'notes',
+            'priority', 'status', 'created_at', 'updated_at'
+        ]
         read_only_fields = ['created_at', 'updated_at']
 
 
 class DataItemWriteSerializer(serializers.ModelSerializer):
     """
     Serializer for creating and updating DataItems.
-    Accepts category ID and handles validation.
+
+    Tags may be supplied either as a comma-separated string (``tags``, tags are
+    created on demand by name) or as a list of existing Tag primary keys
+    (``tag_ids``). Both replace the item's tag set outright; supplying both at
+    once is rejected rather than silently picking a winner.
     """
+    tags = serializers.CharField(
+        write_only=True,
+        required=False,
+        allow_blank=True,
+        help_text="Comma-separated tag names. Tags are created if they do not exist."
+    )
+    tag_ids = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Tag.objects.all(),
+        write_only=True,
+        required=False,
+        help_text="Primary keys of existing tags."
+    )
+
     class Meta:
         model = DataItem
         fields = [
             'name', 'category', 'subcategory', 'description', 'examples',
-            'size_estimate_gb', 'tags', 'source_url', 'notes',
+            'size_estimate_gb', 'tags', 'tag_ids', 'source_url', 'notes',
             'priority', 'status'
         ]
 
@@ -91,12 +176,45 @@ class DataItemWriteSerializer(serializers.ModelSerializer):
         return value
 
     def validate_tags(self, value: str) -> str:
-        """Clean and validate tags format."""
+        """Clean and normalize the comma-separated tag string."""
         if value:
-            # Remove extra whitespace and normalize commas
             tags = [tag.strip() for tag in value.split(',') if tag.strip()]
             return ', '.join(tags)
         return value
+
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        """Reject ambiguous input that sets tags two different ways at once."""
+        if 'tags' in attrs and 'tag_ids' in attrs:
+            raise serializers.ValidationError(
+                "Provide either 'tags' or 'tag_ids', not both."
+            )
+        return attrs
+
+    def _apply_tags(self, instance: DataItem, tags_string, tag_objects) -> None:
+        """Replace the instance's tag set from whichever input was supplied."""
+        if tag_objects is not None:
+            instance.tag_set.set(tag_objects)
+        elif tags_string is not None:
+            instance.tag_set.clear()
+            instance.add_tags_from_string(tags_string)
+
+    def create(self, validated_data: Dict[str, Any]) -> DataItem:
+        tags_string = validated_data.pop('tags', None)
+        tag_objects = validated_data.pop('tag_ids', None)
+        instance = super().create(validated_data)
+        self._apply_tags(instance, tags_string, tag_objects)
+        return instance
+
+    def update(self, instance: DataItem, validated_data: Dict[str, Any]) -> DataItem:
+        tags_string = validated_data.pop('tags', None)
+        tag_objects = validated_data.pop('tag_ids', None)
+        instance = super().update(instance, validated_data)
+        self._apply_tags(instance, tags_string, tag_objects)
+        return instance
+
+    def to_representation(self, instance: DataItem) -> Dict[str, Any]:
+        """Echo back the full read representation after a write."""
+        return DataItemDetailSerializer(instance, context=self.context).data
 
 
 # Alias for backwards compatibility
@@ -137,31 +255,44 @@ class StorageFileSerializer(serializers.ModelSerializer):
         ]
 
     def create(self, validated_data):
-        """Create StorageFile and automatically calculate checksums if file is provided."""
+        """
+        Create a StorageFile, deriving the required columns from the upload.
+
+        The derived values must be set *before* the insert: original_filename
+        and file_size_bytes are non-nullable, so assigning them afterwards is
+        too late to prevent a NOT NULL violation.
+        """
         file_obj = validated_data.get('file')
+        if file_obj:
+            validated_data.setdefault('original_filename', file_obj.name)
+            validated_data.setdefault('file_size_bytes', file_obj.size)
+
         storage_file = super().create(validated_data)
 
         if file_obj:
-            # Set file size from uploaded file
-            storage_file.file_size_bytes = file_obj.size
-            storage_file.original_filename = file_obj.name
-
-            # Calculate checksums
             try:
-                storage_file.calculate_checksums(file_obj)
+                storage_file.calculate_checksums()
                 storage_file.status = 'stored'
-            except Exception as e:
-                storage_file.verification_error = str(e)
+                storage_file.verification_error = ''
+            except Exception as exc:  # noqa: BLE001 - recorded on the row
+                storage_file.verification_error = str(exc)
                 storage_file.status = 'corrupted'
 
-            storage_file.save()
+            storage_file.save(update_fields=[
+                'checksum_md5', 'checksum_sha256', 'status',
+                'verification_error', 'updated_at',
+            ])
 
         return storage_file
 
 
 class StorageFileUploadSerializer(serializers.ModelSerializer):
     """
-    Simplified serializer for file uploads.
+    Serializer for file uploads.
+
+    ``original_filename`` and ``file_size_bytes`` are non-nullable on the model
+    but are never supplied by the client, so they are derived from the uploaded
+    file here. Without that the insert fails with a NOT NULL violation.
     """
     class Meta:
         model = StorageFile
@@ -178,32 +309,42 @@ class StorageFileUploadSerializer(serializers.ModelSerializer):
         max_size = 10 * 1024 * 1024 * 1024  # 10GB
         if value.size > max_size:
             raise serializers.ValidationError(
-                f"File size exceeds maximum allowed size of 10GB."
+                "File size exceeds maximum allowed size of 10GB."
             )
 
         return value
 
+    def validate(self, attrs: Dict[str, Any]) -> Dict[str, Any]:
+        """A file is mandatory on this endpoint; it is what we measure and hash."""
+        if not attrs.get('file'):
+            raise serializers.ValidationError({'file': 'File is required for upload.'})
+        return attrs
 
-class TagSerializer(serializers.ModelSerializer):
-    """
-    Serializer for Tag model.
-    Includes usage count for statistics.
-    """
-    usage_count = serializers.SerializerMethodField()
-    category_name = serializers.CharField(source='category.name', read_only=True)
+    def create(self, validated_data: Dict[str, Any]) -> StorageFile:
+        """Populate the derived columns, then hash the stored file."""
+        upload = validated_data['file']
+        validated_data.setdefault('original_filename', upload.name)
+        validated_data.setdefault('file_size_bytes', upload.size)
 
-    class Meta:
-        model = Tag
-        fields = [
-            'id', 'name', 'slug', 'description', 'color',
-            'category', 'category_name', 'usage_count',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['slug', 'created_at', 'updated_at']
+        storage_file = super().create(validated_data)
 
-    def get_usage_count(self, obj: Tag) -> int:
-        """Returns number of data items using this tag."""
-        return obj.get_usage_count()
+        try:
+            storage_file.calculate_checksums()
+            storage_file.status = 'stored'
+            storage_file.verification_error = ''
+        except Exception as exc:  # noqa: BLE001 - recorded on the row, not raised
+            storage_file.status = 'corrupted'
+            storage_file.verification_error = str(exc)
+
+        storage_file.save(update_fields=[
+            'checksum_md5', 'checksum_sha256', 'status',
+            'verification_error', 'updated_at',
+        ])
+        return storage_file
+
+    def to_representation(self, instance: StorageFile) -> Dict[str, Any]:
+        """Return the full record so the client sees the derived fields."""
+        return StorageFileSerializer(instance, context=self.context).data
 
 
 class StorageProviderSerializer(serializers.ModelSerializer):
@@ -228,8 +369,12 @@ class StorageProviderSerializer(serializers.ModelSerializer):
         read_only_fields = ['created_at', 'updated_at']
 
     def get_estimate_count(self, obj: StorageProvider) -> int:
-        """Returns number of cost estimates using this provider."""
-        return obj.cost_estimates.count()
+        """
+        Returns number of cost estimates using this provider.
+        Prefers the queryset annotation added by StorageProviderViewSet.
+        """
+        annotated = getattr(obj, 'estimate_count_annotated', None)
+        return annotated if annotated is not None else obj.cost_estimates.count()
 
 
 class CostEstimateSerializer(serializers.ModelSerializer):
@@ -266,45 +411,3 @@ class CostEstimateSerializer(serializers.ModelSerializer):
     def get_cost_comparison(self, obj: CostEstimate):
         """Get comparison between estimated and actual costs."""
         return obj.get_cost_comparison()
-
-
-class DataItemWithTagsSerializer(serializers.ModelSerializer):
-    """
-    Enhanced DataItem serializer with tag information.
-    """
-    category_detail = CategorySerializer(source='category', read_only=True)
-    tags = TagSerializer(source='tag_set', many=True, read_only=True)
-    tag_ids = serializers.PrimaryKeyRelatedField(
-        source='tag_set',
-        many=True,
-        queryset=Tag.objects.all(),
-        write_only=True,
-        required=False
-    )
-    size_display = serializers.CharField(source='get_size_display', read_only=True)
-
-    class Meta:
-        model = DataItem
-        fields = [
-            'id', 'name', 'category', 'category_detail', 'subcategory',
-            'description', 'examples', 'size_estimate_gb', 'size_display',
-            'tags', 'tag_ids', 'source_url', 'notes', 'priority', 'status',
-            'created_at', 'updated_at'
-        ]
-        read_only_fields = ['created_at', 'updated_at']
-
-    def create(self, validated_data):
-        """Create DataItem with tags."""
-        tags = validated_data.pop('tag_set', [])
-        instance = super().create(validated_data)
-        if tags:
-            instance.tag_set.set(tags)
-        return instance
-
-    def update(self, instance, validated_data):
-        """Update DataItem with tags."""
-        tags = validated_data.pop('tag_set', None)
-        instance = super().update(instance, validated_data)
-        if tags is not None:
-            instance.tag_set.set(tags)
-        return instance

@@ -1,8 +1,29 @@
-Django>=4.2
-djangorestframework>=3.14
+# Runtime dependencies.
+#
+# Every entry is pinned to the feature series the project is developed and
+# tested against, with an upper bound so that `pip install -r requirements.txt`
+# can never silently pull in a release with breaking changes.
+
+# Web framework
+Django>=5.2,<5.3
+djangorestframework>=3.18,<3.19
+
+# Query-string filtering (?category=, ?status=, ?is_active=, ...).
+# Required by the filterset_fields declared on the API viewsets: without it
+# DRF ignores them and every filtered request returns the full list.
+django-filter>=26.1,<27.0
+
+# WSGI server and static file serving for container/production deployments
+gunicorn>=26.0,<27.0
+whitenoise>=6.12,<7.0
+
+# PostgreSQL driver, used when DJANGO_DB_ENGINE=postgresql.
+# psycopg 3 is the driver Django 5.x prefers; [binary] avoids needing libpq
+# headers and a compiler in the image.
+psycopg[binary]>=3.1,<4.0
 
 # Export functionality
-openpyxl>=3.1.0
+openpyxl>=3.1,<3.2
 
 # File handling and uploads
-Pillow>=10.0.0
+Pillow>=12.0,<13.0

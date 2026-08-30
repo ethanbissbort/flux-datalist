@@ -2,14 +2,17 @@
 Views for the Cold Storage app.
 Handles both REST API endpoints and traditional template-based views.
 """
-from typing import Any, Dict
-from rest_framework import viewsets, filters
+import logging
+
+from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import redirect_to_login
+from django.db.models import Count, Sum, Avg, Q
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.http import HttpRequest, HttpResponse
-from django.db.models import QuerySet
 from django.views.decorators.http import require_http_methods
 
 from .models import (
@@ -19,15 +22,26 @@ from .models import (
 from .serializers import (
     CategorySerializer, DataItemSerializer,
     DataItemListSerializer, DataItemWriteSerializer,
-    DataItemWithTagsSerializer, StorageFileSerializer,
-    StorageFileUploadSerializer, TagSerializer,
+    StorageFileSerializer, StorageFileUploadSerializer, TagSerializer,
     StorageProviderSerializer, CostEstimateSerializer
 )
 from .forms import DataItemForm, JSONImportForm, DataItemFilterForm
 from .services import (
-    JSONImportService, DataItemService, ExportService,
-    BatchOperationService
+    JSONImportService, DataItemService, ExportService, BatchOperationService
 )
+
+logger = logging.getLogger(__name__)
+
+#: Export formats understood by the ``export`` actions. The query parameter is
+#: deliberately NOT called ``format``: DRF reserves that name
+#: (``URL_FORMAT_OVERRIDE``) for content negotiation and raises 404 for any
+#: value that has no matching renderer, before the view body ever runs.
+EXPORT_FORMAT_PARAM = 'export_format'
+
+
+def _export_format(request: HttpRequest) -> str:
+    """Read the requested export format, defaulting to JSON."""
+    return (request.query_params.get(EXPORT_FORMAT_PARAM) or 'json').lower()
 
 
 class CategoryViewSet(viewsets.ModelViewSet):
@@ -35,12 +49,26 @@ class CategoryViewSet(viewsets.ModelViewSet):
     ViewSet for Category model.
     Provides CRUD operations via REST API.
     """
-    queryset = Category.objects.all()
     serializer_class = CategorySerializer
     filterset_fields = ['parent']
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'created_at']
     ordering = ['name']
+
+    def get_queryset(self):
+        """
+        Annotate the counts the serializer reports, so a list of N categories
+        costs one query instead of 2N+1.
+
+        ``full_path`` walks the ancestor chain, so pull the first two levels of
+        parents along too. Deeper hierarchies still cost a query per extra
+        level — inherent to an adjacency list without a recursive CTE — but
+        two levels covers the shapes this data actually has.
+        """
+        return Category.objects.select_related('parent', 'parent__parent').annotate(
+            children_count_annotated=Count('children', distinct=True),
+            item_count_annotated=Count('data_items', distinct=True),
+        )
 
     @action(detail=True, methods=['get'])
     def items(self, request: HttpRequest, pk: int = None) -> Response:
@@ -53,7 +81,6 @@ class CategoryViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=['get'])
     def statistics(self, request: HttpRequest, pk: int = None) -> Response:
         """Get statistics for this category."""
-        from django.db.models import Sum, Count
         category = self.get_object()
 
         stats = {
@@ -67,8 +94,13 @@ class CategoryViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def export(self, request: HttpRequest) -> HttpResponse:
-        """Export categories in various formats."""
-        format_type = request.query_params.get('format', 'json').lower()
+        """
+        Export categories as CSV or JSON.
+
+        Selected with ``?export_format=csv|json`` — see EXPORT_FORMAT_PARAM for
+        why this is not ``?format=``.
+        """
+        format_type = _export_format(request)
         queryset = self.filter_queryset(self.get_queryset())
 
         if format_type == 'csv':
@@ -76,11 +108,16 @@ class CategoryViewSet(viewsets.ModelViewSet):
             response = HttpResponse(content, content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="categories.csv"'
             return response
-        else:  # json
+        if format_type == 'json':
             content = ExportService.export_categories_to_json(queryset)
             response = HttpResponse(content, content_type='application/json')
             response['Content-Disposition'] = 'attachment; filename="categories.json"'
             return response
+
+        return Response(
+            {'error': f"Unsupported export format '{format_type}'. Use csv or json."},
+            status=400,
+        )
 
 
 class DataItemViewSet(viewsets.ModelViewSet):
@@ -88,11 +125,22 @@ class DataItemViewSet(viewsets.ModelViewSet):
     ViewSet for DataItem model.
     Provides CRUD operations via REST API with different serializers for read/write.
     """
-    queryset = DataItem.objects.select_related('category').all()
     filterset_fields = ['category', 'status', 'priority']
-    search_fields = ['name', 'tags', 'description']
+    # 'tags' is not a field on DataItem — tag names live on the related Tag
+    # rows, and the legacy free-text column is 'tags_old'.
+    search_fields = [
+        'name', 'description', 'subcategory', 'tag_set__name', 'tags_old',
+    ]
     ordering_fields = ['name', 'created_at', 'updated_at', 'size_estimate_gb']
     ordering = ['-updated_at']
+
+    def get_queryset(self):
+        """Prefetch tags — every representation renders them."""
+        return (
+            DataItem.objects
+            .select_related('category', 'category__parent')
+            .prefetch_related('tag_set')
+        )
 
     def get_serializer_class(self):
         """Use different serializers for list, detail, and write operations."""
@@ -116,8 +164,13 @@ class DataItemViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def export(self, request: HttpRequest) -> HttpResponse:
-        """Export data items in various formats (CSV, JSON, Excel)."""
-        format_type = request.query_params.get('format', 'json').lower()
+        """
+        Export data items as CSV, JSON or Excel.
+
+        Selected with ``?export_format=csv|json|excel`` — see
+        EXPORT_FORMAT_PARAM for why this is not ``?format=``.
+        """
+        format_type = _export_format(request)
         queryset = self.filter_queryset(self.get_queryset())
 
         if format_type == 'csv':
@@ -125,22 +178,33 @@ class DataItemViewSet(viewsets.ModelViewSet):
             response = HttpResponse(content, content_type='text/csv')
             response['Content-Disposition'] = 'attachment; filename="data_items.csv"'
             return response
-        elif format_type == 'excel' or format_type == 'xlsx':
+
+        if format_type in ('excel', 'xlsx'):
             try:
                 excel_file = ExportService.export_to_excel(queryset)
-                response = HttpResponse(
-                    excel_file.getvalue(),
-                    content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            except ImportError:
+                logger.exception('Excel export unavailable')
+                return Response(
+                    {'error': 'Excel export is unavailable on this server.'},
+                    status=503,
                 )
-                response['Content-Disposition'] = 'attachment; filename="data_items.xlsx"'
-                return response
-            except ImportError as e:
-                return HttpResponse(str(e), status=500)
-        else:  # json
+            response = HttpResponse(
+                excel_file.getvalue(),
+                content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+            )
+            response['Content-Disposition'] = 'attachment; filename="data_items.xlsx"'
+            return response
+
+        if format_type == 'json':
             content = ExportService.export_to_json(queryset)
             response = HttpResponse(content, content_type='application/json')
             response['Content-Disposition'] = 'attachment; filename="data_items.json"'
             return response
+
+        return Response(
+            {'error': f"Unsupported export format '{format_type}'. Use csv, json or excel."},
+            status=400,
+        )
 
     @action(detail=False, methods=['post'])
     def batch_operation(self, request: HttpRequest) -> Response:
@@ -161,15 +225,26 @@ class DataItemViewSet(viewsets.ModelViewSet):
         else:
             queryset = self.filter_queryset(self.get_queryset())
 
+        # 'operation' is passed positionally below, and 'item_ids' has already
+        # been consumed. Forwarding the raw request body would hand the service
+        # a second value for 'operation' and raise TypeError on every call.
+        params = {
+            key: value for key, value in request.data.items()
+            if key not in ('operation', 'item_ids')
+        }
+
         try:
             result = BatchOperationService.get_batch_operation_summary(
-                operation, queryset, **request.data
+                operation, queryset, **params
             )
             return Response(result)
-        except ValueError as e:
-            return Response({'error': str(e)}, status=400)
-        except Exception as e:
-            return Response({'error': f'Operation failed: {str(e)}'}, status=500)
+        except (ValueError, KeyError) as exc:
+            # KeyError here means a required parameter for the operation is
+            # missing — that is bad client input, not a server fault.
+            return Response({'error': str(exc).strip("'")}, status=400)
+        except Exception:
+            logger.exception('Batch operation %r failed', operation)
+            return Response({'error': 'Batch operation failed.'}, status=500)
 
 
 class StorageFileViewSet(viewsets.ModelViewSet):
@@ -195,6 +270,11 @@ class StorageFileViewSet(viewsets.ModelViewSet):
         storage_file = self.get_object()
         checksum_type = request.data.get('checksum_type', 'sha256')
 
+        if checksum_type not in ('md5', 'sha256'):
+            return Response(
+                {'error': "checksum_type must be 'md5' or 'sha256'."}, status=400
+            )
+
         try:
             verified = storage_file.verify_checksum(checksum_type)
             return Response({
@@ -203,8 +283,9 @@ class StorageFileViewSet(viewsets.ModelViewSet):
                 'last_verified_at': storage_file.last_verified_at,
                 'error': storage_file.verification_error if not verified else None
             })
-        except Exception as e:
-            return Response({'error': str(e)}, status=500)
+        except Exception:
+            logger.exception('Checksum verification failed for StorageFile %s', pk)
+            return Response({'error': 'Checksum verification failed.'}, status=500)
 
     @action(detail=True, methods=['post'])
     def calculate_checksum(self, request: HttpRequest, pk: int = None) -> Response:
@@ -213,19 +294,20 @@ class StorageFileViewSet(viewsets.ModelViewSet):
 
         try:
             storage_file.calculate_checksums()
-            storage_file.save()
+            storage_file.save(update_fields=[
+                'checksum_md5', 'checksum_sha256', 'updated_at',
+            ])
             return Response({
                 'md5': storage_file.checksum_md5,
                 'sha256': storage_file.checksum_sha256
             })
-        except Exception as e:
-            return Response({'error': str(e)}, status=500)
+        except Exception:
+            logger.exception('Checksum calculation failed for StorageFile %s', pk)
+            return Response({'error': 'Checksum calculation failed.'}, status=500)
 
     @action(detail=False, methods=['get'])
     def by_status(self, request: HttpRequest) -> Response:
         """Get storage files grouped by status."""
-        from django.db.models import Count
-
         stats = StorageFile.objects.values('status').annotate(
             count=Count('id')
         ).order_by('-count')
@@ -238,7 +320,6 @@ class TagViewSet(viewsets.ModelViewSet):
     ViewSet for Tag model.
     Provides CRUD operations and tag statistics.
     """
-    queryset = Tag.objects.all()
     serializer_class = TagSerializer
     filterset_fields = ['category']
     search_fields = ['name', 'description']
@@ -246,49 +327,43 @@ class TagViewSet(viewsets.ModelViewSet):
     ordering = ['name']
     lookup_field = 'slug'
 
+    def get_queryset(self):
+        """Annotate the usage count the serializer reports (one query, not N+1)."""
+        return Tag.objects.select_related('category').annotate(
+            usage_count_annotated=Count('data_items', distinct=True)
+        )
+
     @action(detail=True, methods=['get'])
     def items(self, request: HttpRequest, slug: str = None) -> Response:
         """Get all items with this tag."""
         tag = self.get_object()
-        items = tag.data_items.all()
-        serializer = DataItemListSerializer(items, many=True)
-        return Response(serializer.data)
+        items = (
+            tag.data_items
+            .select_related('category', 'category__parent')
+            .prefetch_related('tag_set')
+        )
+        page = self.paginate_queryset(items)
+        if page is not None:
+            return self.get_paginated_response(
+                DataItemListSerializer(page, many=True).data
+            )
+        return Response(DataItemListSerializer(items, many=True).data)
 
     @action(detail=False, methods=['get'])
     def popular(self, request: HttpRequest) -> Response:
         """Get most popular tags by usage count."""
-        from django.db.models import Count
-
-        tags = Tag.objects.annotate(
-            usage_count=Count('data_items')
-        ).order_by('-usage_count')[:20]
-
-        serializer = TagSerializer(tags, many=True)
-        return Response(serializer.data)
+        tags = self.get_queryset().order_by('-usage_count_annotated', 'name')[:20]
+        return Response(TagSerializer(tags, many=True).data)
 
     @action(detail=False, methods=['get'])
     def by_category(self, request: HttpRequest) -> Response:
-        """Get tags grouped by category."""
-        from django.db.models import Count
+        """Get tags grouped by category name."""
+        tags_by_category: dict = {}
 
-        tags_by_category = {}
-        categories = Category.objects.all()
-
-        for category in categories:
-            category_tags = Tag.objects.filter(category=category).annotate(
-                usage_count=Count('data_items')
-            ).order_by('name')
-
-            if category_tags.exists():
-                tags_by_category[category.name] = TagSerializer(category_tags, many=True).data
-
-        # Include uncategorized tags
-        uncategorized = Tag.objects.filter(category__isnull=True).annotate(
-            usage_count=Count('data_items')
-        ).order_by('name')
-
-        if uncategorized.exists():
-            tags_by_category['Uncategorized'] = TagSerializer(uncategorized, many=True).data
+        # One pass over every tag rather than a query per category.
+        for tag in self.get_queryset().order_by('category__name', 'name'):
+            key = tag.category.name if tag.category_id else 'Uncategorized'
+            tags_by_category.setdefault(key, []).append(TagSerializer(tag).data)
 
         return Response(tags_by_category)
 
@@ -298,12 +373,17 @@ class StorageProviderViewSet(viewsets.ModelViewSet):
     ViewSet for StorageProvider model.
     Provides CRUD operations and cost comparisons.
     """
-    queryset = StorageProvider.objects.all()
     serializer_class = StorageProviderSerializer
     filterset_fields = ['provider_type', 'is_active']
     search_fields = ['name', 'description']
     ordering_fields = ['name', 'cost_per_gb_monthly', 'created_at']
     ordering = ['name']
+
+    def get_queryset(self):
+        """Annotate the estimate count the serializer reports."""
+        return StorageProvider.objects.annotate(
+            estimate_count_annotated=Count('cost_estimates', distinct=True)
+        )
 
     @action(detail=True, methods=['get'])
     def estimates(self, request: HttpRequest, pk: int = None) -> Response:
@@ -320,6 +400,14 @@ class StorageProviderViewSet(viewsets.ModelViewSet):
             self.get_queryset().filter(is_active=True)
         )
 
+        providers = providers.annotate(
+            active_estimate_count=Count(
+                'cost_estimates',
+                filter=Q(cost_estimates__is_active=True),
+                distinct=True,
+            )
+        )
+
         comparison = []
         for provider in providers:
             comparison.append({
@@ -329,7 +417,7 @@ class StorageProviderViewSet(viewsets.ModelViewSet):
                 'cost_per_gb_monthly': float(provider.cost_per_gb_monthly),
                 'retrieval_cost_per_gb': float(provider.retrieval_cost_per_gb),
                 'api_cost_per_1000_requests': float(provider.api_cost_per_1000_requests),
-                'estimate_count': provider.cost_estimates.filter(is_active=True).count()
+                'estimate_count': provider.active_estimate_count,
             })
 
         # Sort by cost per GB
@@ -426,7 +514,7 @@ class CostEstimateViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=['get'])
     def summary(self, request: HttpRequest) -> Response:
         """Get summary of all cost estimates."""
-        from django.db.models import Sum, Avg, Count
+
 
         queryset = self.filter_queryset(
             self.get_queryset().filter(is_active=True)
@@ -503,14 +591,22 @@ def index(request: HttpRequest) -> HttpResponse:
     Displays list of items and form for adding new items.
     """
     if request.method == 'POST':
+        # Reads stay open (matching the API's IsAuthenticatedOrReadOnly), but
+        # writes must not be. Without this an anonymous visitor can create
+        # items through the web form while the API correctly refuses them.
+        if not request.user.is_authenticated:
+            messages.error(request, 'You must be signed in to add items.')
+            return redirect_to_login(request.get_full_path())
+
         form = DataItemForm(request.POST)
         if form.is_valid():
             try:
                 form.save()
                 messages.success(request, 'Data item added successfully!')
                 return redirect('index')
-            except Exception as e:
-                messages.error(request, f'Error adding item: {str(e)}')
+            except Exception:
+                logger.exception('Failed to save DataItem from web form')
+                messages.error(request, 'Error adding item. Please try again.')
         else:
             for field, errors in form.errors.items():
                 for error in errors:
@@ -520,7 +616,7 @@ def index(request: HttpRequest) -> HttpResponse:
 
     # Get filter form and apply filters
     filter_form = DataItemFilterForm(request.GET)
-    items = DataItem.objects.select_related('category').all()
+    items = DataItem.objects.select_related('category').prefetch_related('tag_set')
 
     if filter_form.is_valid():
         items = filter_form.filter_queryset(items)
@@ -536,11 +632,15 @@ def index(request: HttpRequest) -> HttpResponse:
     return render(request, 'index.html', context)
 
 
+@login_required
 @require_http_methods(["POST"])
 def import_json(request: HttpRequest) -> HttpResponse:
     """
     Import data items from uploaded JSON file.
     Uses JSONImportService to handle the import logic.
+
+    Requires authentication: this creates items and auto-creates categories in
+    bulk, which anonymous visitors must not be able to do.
     """
     form = JSONImportForm(request.POST, request.FILES)
 
@@ -569,7 +669,7 @@ def import_json(request: HttpRequest) -> HttpResponse:
                 messages.error(request, error_summary)
 
     except Exception as e:
-        messages.error(request, f'Unexpected error during import: {str(e)}')
+        messages.error(request, "Unexpected error during import.")
 
     return redirect('index')
 

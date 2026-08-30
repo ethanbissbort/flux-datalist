@@ -9,6 +9,10 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 urlpatterns = [
     path('admin/', admin.site.urls),
+    # Django's default LOGIN_URL is /accounts/login/. The web views redirect
+    # unauthenticated writers there, so the route has to exist — otherwise the
+    # redirect lands on a 404 and the queued message is discarded with it.
+    path('accounts/', include('django.contrib.auth.urls')),
     path('api-auth/', include('rest_framework.urls')),
     path('api/auth/token/', obtain_auth_token, name='api_token_auth'),
     path('', include('coldstorage.urls')),

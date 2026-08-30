@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sign in &middot; Cold Storage</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css"
+        rel="stylesheet"
+        integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN"
+        crossorigin="anonymous">
+</head>
+<body class="bg-light">
+  <div class="container" style="max-width: 26rem;">
+    <div class="card shadow-sm my-5">
+      <div class="card-body p-4">
+        <h1 class="h4 mb-1">🧊 Cold Storage</h1>
+        <p class="text-muted small mb-4">Sign in to add or import items.</p>
+
+        {% if messages %}
+          {% for message in messages %}
+            <div class="alert {% if 'error' in message.tags %}alert-danger{% elif 'warning' in message.tags %}alert-warning{% elif 'success' in message.tags %}alert-success{% else %}alert-info{% endif %} py-2 small">
+              {{ message }}
+            </div>
+          {% endfor %}
+        {% endif %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2 small">
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+          </div>
+        {% endif %}
+
+        <form method="post">
+          {% csrf_token %}
+          {% for field in form %}
+            <div class="mb-3">
+              <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+              {{ field }}
+              {% for error in field.errors %}
+                <div class="text-danger small mt-1">{{ error }}</div>
+              {% endfor %}
+            </div>
+          {% endfor %}
+          <input type="hidden" name="next" value="{{ next }}">
+          <button type="submit" class="btn btn-primary w-100">Sign in</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Django's AuthenticationForm ships unstyled widgets; add Bootstrap classes
+    // without needing a form override just for presentation.
+    document.querySelectorAll('form input[type="text"], form input[type="password"]')
+      .forEach(function (el) { el.classList.add('form-control'); });
+  </script>
+</body>
+</html>

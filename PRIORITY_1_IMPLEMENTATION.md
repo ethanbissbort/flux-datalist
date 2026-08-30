@@ -4,6 +4,14 @@
 **Date**: November 15, 2025
 **Branch**: `claude/create-claude-md-01RNqDFeeRCkdm1oWB6CQegT`
 
+
+> **Status note (2026-08-30).** A full repository audit ([`AUDIT.md`](AUDIT.md)) found that much of
+> what this document marks ✅ complete did not actually work at runtime: a field rename
+> (`DataItem.tags` → `tags_old` / `tag_set`) was never propagated to nine call sites, and 12 of 25
+> exercised entry points returned HTTP 500 or failed silently. Those defects have since been fixed
+> and covered by regression tests in `coldstorage/tests.py`. Treat the ✅ markers below as
+> "implemented and now verified", and the audit as the authoritative record of what was broken.
+
 ---
 
 ## Overview
@@ -48,11 +56,11 @@ All Priority 1 features from the feature roadmap have been successfully implemen
 
 **API Endpoints:**
 ```
-GET /api/items/export/?format=csv
-GET /api/items/export/?format=json
-GET /api/items/export/?format=excel
-GET /api/categories/export/?format=csv
-GET /api/categories/export/?format=json
+GET /api/items/export/?export_format=csv
+GET /api/items/export/?export_format=json
+GET /api/items/export/?export_format=excel
+GET /api/categories/export/?export_format=csv
+GET /api/categories/export/?export_format=json
 ```
 
 **Features:**
@@ -65,13 +73,13 @@ GET /api/categories/export/?format=json
 
 ```bash
 # Export all items to CSV
-curl http://localhost:8000/api/items/export/?format=csv > items.csv
+curl http://localhost:8000/api/items/export/?export_format=csv > items.csv
 
 # Export verified items to Excel
-curl "http://localhost:8000/api/items/export/?format=excel&status=verified" > verified_items.xlsx
+curl "http://localhost:8000/api/items/export/?export_format=excel&status=verified" > verified_items.xlsx
 
 # Export high priority items to JSON
-curl "http://localhost:8000/api/items/export/?format=json&priority=high" > high_priority.json
+curl "http://localhost:8000/api/items/export/?export_format=json&priority=high" > high_priority.json
 ```
 
 ---

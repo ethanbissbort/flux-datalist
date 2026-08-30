@@ -1,9 +1,19 @@
 import hashlib
 import os
 from django.db import models
+from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.core.validators import MinValueValidator
 from django.urls import reverse
 from django.conf import settings
+
+
+# Category trees are only ever a handful of levels deep in practice, so a walk
+# that gets this far is corrupt data rather than a legitimate hierarchy.
+MAX_CATEGORY_DEPTH = 100
+
+# Stands in for the part of a path that cannot be walked because the rows form
+# a cycle: a poisoned row stays readable so an operator can go and fix it.
+CYCLE_MARKER = '[cycle]'
 
 
 class Category(models.Model):
@@ -34,21 +44,101 @@ class Category(models.Model):
         return self.name
 
     def get_full_path(self):
-        """Returns the full hierarchical path of the category"""
+        """
+        Returns the full hierarchical path of the category.
+
+        The walk is bounded by a visited set and MAX_CATEGORY_DEPTH: a row that
+        is already part of a parent cycle must stay readable instead of pinning
+        a worker at 100% CPU forever.
+        """
         path = [self.name]
+        visited = {self.pk} if self.pk is not None else set()
         parent = self.parent
-        while parent:
+        depth = 0
+
+        while parent is not None:
+            if depth >= MAX_CATEGORY_DEPTH or parent.pk in visited:
+                # Degrade gracefully rather than raising.
+                path.insert(0, CYCLE_MARKER)
+                break
+            visited.add(parent.pk)
             path.insert(0, parent.name)
             parent = parent.parent
+            depth += 1
+
         return " > ".join(path)
 
     def get_descendants(self):
-        """Returns all descendant categories"""
+        """
+        Returns all descendant categories, depth-first and pre-order.
+
+        Iterative, with a visited set and a depth cap, so a cyclic row cannot
+        recurse forever; every category is returned at most once.
+        """
         descendants = []
-        for child in self.children.all():
-            descendants.append(child)
-            descendants.extend(child.get_descendants())
+        if self.pk is None:
+            return descendants
+
+        visited = {self.pk}
+        stack = [(child, 1) for child in reversed(list(self.children.all()))]
+
+        while stack:
+            node, depth = stack.pop()
+            if node.pk in visited:
+                continue
+            visited.add(node.pk)
+            descendants.append(node)
+            if depth < MAX_CATEGORY_DEPTH:
+                stack.extend(
+                    (child, depth + 1)
+                    for child in reversed(list(node.children.all()))
+                )
+
         return descendants
+
+    def would_create_cycle(self, parent) -> bool:
+        """
+        Return True if assigning ``parent`` to this category would create a
+        circular reference (including making the category its own parent).
+
+        The ancestor walk is itself bounded by a visited set and
+        MAX_CATEGORY_DEPTH, so it stays safe when the stored rows are already
+        corrupt. A chain that is already cyclic, or absurdly deep, is reported
+        as unsafe too: attaching to it would poison this row as well.
+        """
+        if parent is None:
+            return False
+        if parent is self:
+            return True
+        if self.pk is None:
+            # An unsaved category cannot yet be anybody's ancestor.
+            return False
+
+        visited = set()
+        current = parent
+        depth = 0
+
+        while current is not None:
+            if current.pk is not None and current.pk == self.pk:
+                return True
+            key = current.pk if current.pk is not None else ('obj', id(current))
+            if key in visited:
+                return True
+            visited.add(key)
+            depth += 1
+            if depth > MAX_CATEGORY_DEPTH:
+                return True
+            current = current.parent
+
+        return False
+
+    def clean(self):
+        """Reject a parent assignment that would create a circular reference."""
+        super().clean()
+        if self.would_create_cycle(self.parent):
+            raise ValidationError(
+                'Cannot set parent: would create a circular reference.'
+            )
 
 
 class Tag(models.Model):
@@ -467,55 +557,148 @@ class StorageFile(models.Model):
         else:
             return f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
 
-    def calculate_checksums(self, file_obj=None):
+    def _resolve_storage_path(self):
         """
-        Calculate MD5 and SHA-256 checksums for the file.
-        Uses the uploaded file or reads from storage_path.
+        Resolve ``storage_path`` to a real path confined to the allowed roots.
+
+        ``storage_path`` is free-form input from the API and the admin, so it is
+        untrusted: without this check any authenticated user could make the
+        worker read - and fingerprint by digest - arbitrary server files.
         """
-        if file_obj is None and self.file:
-            file_obj = self.file.open('rb')
-        elif file_obj is None and self.storage_path and os.path.exists(self.storage_path):
-            file_obj = open(self.storage_path, 'rb')
-        elif file_obj is None:
+        raw = (self.storage_path or '').strip()
+        if not raw:
             raise ValueError("No file available for checksum calculation")
+
+        roots = getattr(settings, 'COLDSTORAGE_ALLOWED_STORAGE_ROOTS', None) or [
+            settings.MEDIA_ROOT
+        ]
+        if isinstance(roots, (str, os.PathLike)):
+            roots = [roots]
+
+        # realpath() collapses '..' segments and follows symlinks, so neither a
+        # traversal nor a symlink planted inside an allowed root can escape.
+        candidate = os.path.realpath(raw)
+
+        for root in roots:
+            if not root:
+                continue
+            root_real = os.path.realpath(str(root))
+            try:
+                # commonpath() is separator aware: '/media-evil' does not match
+                # the root '/media', which a str.startswith() test would allow.
+                if os.path.commonpath([candidate, root_real]) == root_real:
+                    return candidate
+            except ValueError:
+                # Not comparable (e.g. different drives on Windows).
+                continue
+
+        # Deliberately does not echo the requested path back to the caller.
+        raise SuspiciousFileOperation(
+            "storage_path is outside the allowed storage roots"
+        )
+
+    def _compute_digests(self, file_obj=None):
+        """
+        Compute and return ``(md5, sha256)`` for this file.
+
+        Deliberately never touches ``self``: verify_checksum() depends on that
+        so a recalculated digest can never overwrite the stored baseline.
+        """
+        opened_here = False
+
+        if file_obj is None:
+            if self.file:
+                file_obj = self.file.open('rb')
+                opened_here = True
+            elif self.storage_path:
+                file_obj = open(self._resolve_storage_path(), 'rb')
+                opened_here = True
+            else:
+                raise ValueError("No file available for checksum calculation")
+        else:
+            # A caller-supplied handle may already be at EOF (e.g. an upload
+            # Django has just written to storage).
+            try:
+                file_obj.seek(0)
+            except (AttributeError, OSError, ValueError):
+                pass
 
         md5_hash = hashlib.md5()
         sha256_hash = hashlib.sha256()
 
-        # Read file in chunks to handle large files
-        for chunk in iter(lambda: file_obj.read(8192), b''):
-            md5_hash.update(chunk)
-            sha256_hash.update(chunk)
+        try:
+            # Read file in chunks to handle large files
+            for chunk in iter(lambda: file_obj.read(8192), b''):
+                md5_hash.update(chunk)
+                sha256_hash.update(chunk)
+        finally:
+            # Only close handles we opened ourselves.
+            if opened_here and hasattr(file_obj, 'close'):
+                file_obj.close()
 
-        self.checksum_md5 = md5_hash.hexdigest()
-        self.checksum_sha256 = sha256_hash.hexdigest()
+        return md5_hash.hexdigest(), sha256_hash.hexdigest()
 
-        # Close file if we opened it
-        if hasattr(file_obj, 'close'):
-            file_obj.close()
+    def calculate_checksums(self, file_obj=None):
+        """
+        Calculate and store MD5 and SHA-256 checksums for the file.
+        Uses the uploaded file or reads from storage_path.
+
+        This is the only method that writes the stored digests: it establishes
+        (or deliberately re-establishes) the baseline, and is called explicitly
+        by the API and admin actions. Verification must never call it.
+        """
+        self.checksum_md5, self.checksum_sha256 = self._compute_digests(file_obj)
+
+    def _save_verification_state(self):
+        """
+        Persist only the verification bookkeeping fields.
+
+        Restricting the write guarantees a verification can never overwrite the
+        stored checksum baseline, whatever else happened to the in-memory
+        instance beforehand.
+        """
+        if self.pk is None:
+            self.save()
+            return
+        self.save(update_fields=[
+            'status', 'last_verified_at', 'verification_error', 'updated_at'
+        ])
 
     def verify_checksum(self, checksum_type='sha256'):
         """
-        Verify file integrity by recalculating checksum.
-        Returns True if checksum matches, False otherwise.
+        Verify file integrity against the *stored* checksum baseline.
+
+        Returns True only when the bytes on disk still hash to the digest that
+        was recorded earlier. The freshly computed digest is never written to
+        the model, so a verification cannot destroy the evidence of corruption
+        (and thereby report the same corrupt file as clean next time round).
         """
         from django.utils import timezone
 
         try:
-            # Store original checksums
-            original_md5 = self.checksum_md5
-            original_sha256 = self.checksum_sha256
+            stored = (
+                self.checksum_md5 if checksum_type == 'md5'
+                else self.checksum_sha256
+            )
 
-            # Recalculate checksums
-            self.calculate_checksums()
+            if not stored:
+                # Nothing to compare against - a "match" here would be vacuous.
+                self.last_verified_at = timezone.now()
+                self.verification_error = (
+                    f'No baseline {checksum_type.upper()} checksum recorded; '
+                    'run calculate_checksums() to establish one.'
+                )
+                if self.status == 'verified':
+                    # That claim is not backed by any baseline.
+                    self.status = 'pending'
+                self._save_verification_state()
+                return False
 
-            # Check if they match
-            if checksum_type == 'md5':
-                verified = self.checksum_md5 == original_md5
-            else:  # sha256
-                verified = self.checksum_sha256 == original_sha256
+            md5_digest, sha256_digest = self._compute_digests()
+            current = md5_digest if checksum_type == 'md5' else sha256_digest
+            verified = current == stored
 
-            # Update status
+            # Update status. self.checksum_* are left exactly as stored.
             self.last_verified_at = timezone.now()
             if verified:
                 self.status = 'verified'
@@ -524,14 +707,14 @@ class StorageFile(models.Model):
                 self.status = 'corrupted'
                 self.verification_error = f'{checksum_type.upper()} checksum mismatch'
 
-            self.save()
+            self._save_verification_state()
             return verified
 
         except Exception as e:
             self.status = 'corrupted'
             self.verification_error = str(e)
             self.last_verified_at = timezone.now()
-            self.save()
+            self._save_verification_state()
             return False
 
     def get_absolute_url(self):
@@ -638,9 +821,33 @@ class CostEstimate(models.Model):
     def __str__(self):
         return f"{self.data_item.name} @ {self.provider.name}"
 
+    def _costs_are_unset(self):
+        """True when none of the three estimate fields has been supplied."""
+        from decimal import Decimal, InvalidOperation
+
+        for field_name in ('monthly_storage_cost', 'annual_storage_cost',
+                           'estimated_retrieval_cost'):
+            value = getattr(self, field_name)
+            if value is None:
+                continue
+            default = self._meta.get_field(field_name).get_default()
+            try:
+                if Decimal(str(value)) != Decimal(str(default)):
+                    return False
+            except (InvalidOperation, TypeError, ValueError):
+                return False
+        return True
+
     def save(self, *args, **kwargs):
-        """Auto-calculate costs before saving."""
-        if not self.monthly_storage_cost:
+        """
+        Auto-calculate costs only when creating an estimate that supplied none.
+
+        Recalculating on every falsy cost silently overwrote operator-entered
+        values and re-derived legitimately free ($0.00) local/NAS tiers on each
+        save. Explicit recalculation goes through calculate_costs(), which the
+        recalculate / bulk_recalculate API actions and the admin action call.
+        """
+        if self._state.adding and self._costs_are_unset():
             self.calculate_costs()
         super().save(*args, **kwargs)
 

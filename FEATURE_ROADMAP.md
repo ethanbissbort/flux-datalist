@@ -4,6 +4,14 @@
 
 The codebase has been comprehensively refactored following Django and Python best practices. This document outlines the improvements made and proposes a roadmap for new features to enhance the Cold Storage Data Acquisition system.
 
+
+> **Status note (2026-08-30).** A full repository audit ([`AUDIT.md`](AUDIT.md)) found that much of
+> what this document marks ✅ complete did not actually work at runtime: a field rename
+> (`DataItem.tags` → `tags_old` / `tag_set`) was never propagated to nine call sites, and 12 of 25
+> exercised entry points returned HTTP 500 or failed silently. Those defects have since been fixed
+> and covered by regression tests in `coldstorage/tests.py`. Treat the ✅ markers below as
+> "implemented and now verified", and the audit as the authoritative record of what was broken.
+
 ---
 
 ## ✅ Refactoring Completed
@@ -508,7 +516,7 @@ pillow>=10.0.0             # Image handling (if needed)
 # Phase 2-3
 django-taggit>=4.0.0       # Or custom tagging
 django-reversion>=5.0.0    # Version control
-django-filters>=23.0       # Advanced filtering
+django-filter>=23.0        # Advanced filtering (package is django-filter, not django-filters)
 elasticsearch>=8.0.0       # Full-text search (optional)
 
 # Phase 3-4
