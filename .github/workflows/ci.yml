@@ -55,11 +55,20 @@ jobs:
           DJANGO_DEBUG: '1'
         run: python manage.py makemigrations --check --dry-run
 
-      - name: Test suite
-        # DJANGO_DEBUG=1 is required, not incidental. With debug off the
-        # settings enable SECURE_SSL_REDIRECT, and every test-client request
-        # 301s instead of returning its real status — 35 tests fail with a
-        # misleading error. Do not "harden" this to 0.
+      - name: Test suite (production security profile)
+        # The configuration that actually ships: debug off, so HSTS, secure
+        # session and CSRF cookies and the proxy SSL header are all live.
+        # test_settings relaxes exactly one setting — the HTTPS redirect, which
+        # the test client cannot follow — and SecuritySettingsUnderTestTests
+        # fails if anything else is ever relaxed alongside it.
+        run: |
+          python manage.py test coldstorage \
+            --settings=coldstorage_project.test_settings --verbosity 2
+
+      - name: Test suite (development settings)
+        # The configuration contributors actually run locally. Cheap, and it
+        # catches breakage that only appears with debug on — the reverse of
+        # what the profile above covers.
         env:
           DJANGO_DEBUG: '1'
         run: python manage.py test coldstorage --verbosity 2

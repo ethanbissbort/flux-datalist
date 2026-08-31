@@ -18,7 +18,8 @@ This is a Django-based web application for managing and archiving critical data 
 flux-datalist/
 ├── coldstorage_project/          # Main Django project directory
 │   ├── coldstorage_project/      # Project settings and config
-│   │   ├── settings.py           # Django settings
+│   │   ├── settings.py           # Django settings (environment-driven)
+│   │   ├── test_settings.py      # Suite against the production security profile
 │   │   ├── urls.py               # Root URL configuration
 │   │   ├── wsgi.py               # WSGI config
 │   │   └── asgi.py               # ASGI config
@@ -111,10 +112,14 @@ python manage.py createsuperuser
 ```bash
 cd coldstorage_project
 python manage.py test coldstorage
+
+# Against the configuration that actually ships (debug off, HSTS, secure cookies):
+python manage.py test coldstorage --settings=coldstorage_project.test_settings
 ```
 
 Every test maps to a finding in `AUDIT.md`. `RouteSmokeTests` walks the URLconf and asserts no
-route 5xxs — run it before any commit that touches views, serializers or models.
+route 5xxs — run it before any commit that touches views, serializers or models. CI runs the suite
+under both configurations.
 
 Before deploying:
 
@@ -173,13 +178,21 @@ These are not style preferences. Each one is a defect that reached `main` and is
 7. **Web writes require auth.** `index` (POST) and `import_json` are gated to match the API's
    `IsAuthenticatedOrReadOnly`. Reads stay open.
 
-8. **Vue templates must sit inside `{% verbatim %}`.** Django renders `{{ }}` server-side first and
+8. **`test_settings.py` may relax exactly one production setting.** It exists so the suite runs
+   against the deployed configuration rather than a development one, and that value is entirely in
+   the "exactly one" part. `SECURE_SSL_REDIRECT` is off because the test client speaks plain HTTP
+   and cannot follow a 301 to an https:// URL; everything else the production profile turns on
+   stays on. `SecuritySettingsUnderTestTests` diffs the module against the real settings and fails
+   if a second relaxation appears — do not silence it to make a test pass.
+
+9. **Vue templates must sit inside `{% verbatim %}`.** Django renders `{{ }}` server-side first and
    will otherwise silently blank every Vue binding.
 
 ## Notes for Claude Code
 
 - Static files are collected at image build and served by WhiteNoise
-- `DEBUG` defaults to **off**; a missing `DJANGO_SECRET_KEY` with debug off is a hard startup error
+- `DEBUG` defaults to **off**, except in an unconfigured git working tree (a developer machine);
+  a missing `DJANGO_SECRET_KEY` with debug off is a hard startup error
 - The app is designed to be modular and extensible
 - Follow Django best practices for models, views, and URL routing
 - Use Django REST Framework conventions for API endpoints
