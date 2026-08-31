@@ -2,6 +2,8 @@
 
 # 🧊 Cold Storage Data Acquisition Web App
 
+[![CI](https://github.com/ethanbissbort/flux-datalist/actions/workflows/ci.yml/badge.svg)](https://github.com/ethanbissbort/flux-datalist/actions/workflows/ci.yml)
+
 A Django-based, modular database for managing and archiving critical data for long-term cold
 storage — operating systems, software, games, media, and scientific archives.
 
@@ -84,6 +86,14 @@ Also worth running before a deploy:
 python manage.py check --deploy
 ```
 
+**Note:** run the suite with `DJANGO_DEBUG=1` (the default in a source checkout). With debug off
+the settings enable `SECURE_SSL_REDIRECT`, so every test-client request is answered with a 301 and
+35 tests fail with a misleading error.
+
+CI runs all of this on every push and pull request — the test suite, `check`, `check --deploy`, a
+missing-migration check, and a Docker build plus container smoke test. See
+[`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
 ---
 
 ## 🌐 API
@@ -162,15 +172,22 @@ bad row rolls back only itself. Sample files are in `coldstorage_project/sample_
 
 ## ⚙️ Configuration
 
-All settings are environment-driven; `DEBUG` defaults to **off**.
+All settings are environment-driven.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DJANGO_DEBUG` | `0` | Never enable in production |
-| `DJANGO_SECRET_KEY` | dev-only fallback | **Required** when `DJANGO_DEBUG=0` |
+| `DJANGO_DEBUG` | `0`, but see below | Never enable in production |
+| `DJANGO_SECRET_KEY` | generated per checkout | **Required** when `DJANGO_DEBUG=0` — startup fails without it |
 | `DJANGO_ALLOWED_HOSTS` | localhost set | Comma-separated |
 | `DJANGO_DB_ENGINE` | `sqlite3` | or `postgresql` |
 | `COLDSTORAGE_ALLOWED_STORAGE_ROOTS` | `[MEDIA_ROOT]` | Directories `storage_path` may read from |
+
+`DJANGO_DEBUG` defaults to off **except** in a git working tree with the variable unset, which is
+treated as a developer machine so `manage.py` works in a fresh checkout. Images built from the
+Dockerfile exclude `.git` and therefore always default to off. The consequence worth knowing: a
+server deployed by `git clone` with no environment variables set still comes up with debug on. It
+warns loudly at startup, and the secret key is generated per checkout rather than shared, but set
+`DJANGO_DEBUG=0` explicitly on any deployment.
 
 With `DJANGO_DEBUG=0`, HTTPS redirect, HSTS and secure session/CSRF cookies switch on
 automatically.

@@ -1,0 +1,114 @@
+name: CI
+
+# The repository shipped a field rename that broke 12 of 25 entry points and
+# nothing caught it, because nothing ran. These gates are what stands between
+# main and a repeat; see AUDIT.md for what each one is guarding against.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # Python version the Dockerfile pins, so CI matches what actually ships.
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  test:
+    name: Tests and checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    defaults:
+      run:
+        working-directory: coldstorage_project
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r ../requirements.txt
+
+      - name: Django system checks
+        env:
+          DJANGO_DEBUG: '1'
+        run: python manage.py check --fail-level WARNING
+
+      - name: No missing migrations
+        # Guards model/migration drift: a model edited without a migration
+        # passes every other gate here and then fails on deploy.
+        env:
+          DJANGO_DEBUG: '1'
+        run: python manage.py makemigrations --check --dry-run
+
+      - name: Test suite
+        # DJANGO_DEBUG=1 is required, not incidental. With debug off the
+        # settings enable SECURE_SSL_REDIRECT, and every test-client request
+        # 301s instead of returning its real status — 35 tests fail with a
+        # misleading error. Do not "harden" this to 0.
+        env:
+          DJANGO_DEBUG: '1'
+        run: python manage.py test coldstorage --verbosity 2
+
+      - name: Deployment checks
+        # The production security posture: HSTS, SSL redirect, secure session
+        # and CSRF cookies. Runs with debug off and a real key, which is also
+        # a live check that settings refuse to start without one.
+        env:
+          DJANGO_DEBUG: '0'
+          DJANGO_ALLOWED_HOSTS: example.com
+        run: |
+          export DJANGO_SECRET_KEY="$(python -c 'import secrets; print(secrets.token_urlsafe(64))')"
+          python manage.py check --deploy --fail-level WARNING
+
+  docker:
+    name: Docker image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build image
+        # The Dockerfile was unbuildable for the whole life of the repo: it ran
+        # `python manage.py` from /app while manage.py sits in
+        # /app/coldstorage_project. Nothing caught it because nobody built it
+        # in CI. Now something does.
+        run: docker build -t flux-datalist:ci .
+
+      - name: Container starts, migrates, and serves
+        # Exercises the real path: entrypoint applies migrations, settings
+        # import with debug off, and the WSGI callable resolves under gunicorn.
+        run: |
+          docker run --rm \
+            -e DJANGO_DEBUG=0 \
+            -e DJANGO_SECRET_KEY="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')" \
+            -e DJANGO_ALLOWED_HOSTS=localhost \
+            flux-datalist:ci \
+            gunicorn --check-config coldstorage_project.wsgi:application
+
+      - name: Container refuses to start without a secret key
+        # The negative case matters as much as the positive one: a deployment
+        # that forgets DJANGO_SECRET_KEY must fail loudly rather than quietly
+        # serving with a fallback.
+        run: |
+          if docker run --rm -e DJANGO_DEBUG=0 flux-datalist:ci \
+               gunicorn --check-config coldstorage_project.wsgi:application; then
+            echo "::error::Image started with DEBUG off and no DJANGO_SECRET_KEY"
+            exit 1
+          fi
+          echo "Correctly refused to start without DJANGO_SECRET_KEY."
