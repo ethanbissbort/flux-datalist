@@ -80,18 +80,27 @@ The suite is a regression net over the defects in [`AUDIT.md`](AUDIT.md). `Route
 the URLconf and asserts that no registered route returns a server error — the single cheapest
 guard against the class of breakage that audit found.
 
+That command runs against the development configuration. To run against the configuration that
+actually ships — debug off, HSTS, secure session and CSRF cookies, proxy SSL header — use the test
+settings module:
+
+```bash
+python manage.py test coldstorage --settings=coldstorage_project.test_settings
+```
+
+It imports the real settings with debug off and relaxes exactly one thing: `SECURE_SSL_REDIRECT`,
+which the Django test client speaks plain HTTP and cannot follow. `SecuritySettingsUnderTestTests`
+asserts that it is the *only* relaxation, so the module cannot quietly become a second development
+config. CI runs the suite both ways.
+
 Also worth running before a deploy:
 
 ```bash
 python manage.py check --deploy
 ```
 
-**Note:** run the suite with `DJANGO_DEBUG=1` (the default in a source checkout). With debug off
-the settings enable `SECURE_SSL_REDIRECT`, so every test-client request is answered with a 301 and
-35 tests fail with a misleading error.
-
-CI runs all of this on every push and pull request — the test suite, `check`, `check --deploy`, a
-missing-migration check, and a Docker build plus container smoke test. See
+CI runs all of this on every push and pull request — the suite under both configurations, `check`,
+`check --deploy`, a missing-migration check, and a Docker build plus container smoke test. See
 [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 ---

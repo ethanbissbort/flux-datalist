@@ -23,6 +23,7 @@ from pathlib import Path
 from django.contrib.auth.models import User
 from django.core.exceptions import SuspiciousFileOperation, ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.conf import settings
 from django.test import TestCase, override_settings
 from django.urls import get_resolver
 from rest_framework.test import APIClient
@@ -762,3 +763,96 @@ class SettingsPostureTests(TestCase):
         )
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(result.stdout.split(), ['False', 'True', 'True', 'True', 'True'])
+
+
+class SecuritySettingsUnderTestTests(TestCase):
+    """
+    Guards ``coldstorage_project/test_settings.py``.
+
+    That module exists so the suite runs against the deployed configuration
+    rather than a development one. Its whole value rests on relaxing exactly
+    one setting, so this asserts that claim directly: anything else that gets
+    turned off there to make a test pass will fail here instead.
+    """
+
+    TEST_SETTINGS_MODULE = 'coldstorage_project.test_settings'
+
+    #: The settings that together make up the deployed security posture.
+    SECURITY_SETTINGS = (
+        'DEBUG',
+        'SECURE_SSL_REDIRECT',
+        'SESSION_COOKIE_SECURE',
+        'CSRF_COOKIE_SECURE',
+        'SECURE_HSTS_SECONDS',
+        'SECURE_HSTS_INCLUDE_SUBDOMAINS',
+        'SECURE_HSTS_PRELOAD',
+        'SECURE_CONTENT_TYPE_NOSNIFF',
+        'SECURE_REFERRER_POLICY',
+        'SECURE_PROXY_SSL_HEADER',
+        'SESSION_COOKIE_HTTPONLY',
+        'X_FRAME_OPTIONS',
+    )
+
+    def setUp(self):
+        super().setUp()
+        if settings.SETTINGS_MODULE != self.TEST_SETTINGS_MODULE:
+            self.skipTest(
+                f'only meaningful under --settings={self.TEST_SETTINGS_MODULE} '
+                f'(currently {settings.SETTINGS_MODULE})'
+            )
+
+    def _production_values(self):
+        """Read the same settings from the real module with debug off."""
+        script = (
+            "import os, sys, json; sys.path.insert(0, %r);"
+            "os.environ['DJANGO_SETTINGS_MODULE'] = 'coldstorage_project.settings';"
+            "import django; django.setup();"
+            "from django.conf import settings as s;"
+            "print(json.dumps({k: getattr(s, k, None) for k in %r}))"
+        ) % (str(Path(__file__).resolve().parent.parent), self.SECURITY_SETTINGS)
+
+        env = dict(os.environ)
+        env['DJANGO_DEBUG'] = '0'
+        env.setdefault('DJANGO_SECRET_KEY', secrets.token_urlsafe(64))
+        result = subprocess.run(
+            [sys.executable, '-c', script],
+            capture_output=True, text=True, env=env,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(result.stdout)
+
+    def test_debug_is_off(self):
+        self.assertFalse(
+            settings.DEBUG,
+            'the point of this settings module is to exercise the debug-off '
+            'configuration; an inherited DJANGO_DEBUG=1 must not defeat it',
+        )
+
+    def test_production_security_posture_is_active(self):
+        self.assertTrue(settings.SESSION_COOKIE_SECURE)
+        self.assertTrue(settings.CSRF_COOKIE_SECURE)
+        self.assertTrue(settings.SECURE_CONTENT_TYPE_NOSNIFF)
+        self.assertTrue(settings.SECURE_HSTS_SECONDS > 0)
+        self.assertEqual(settings.X_FRAME_OPTIONS, 'DENY')
+
+    def test_ssl_redirect_is_the_only_relaxation(self):
+        production = self._production_values()
+
+        def normalise(value):
+            # SECURE_PROXY_SSL_HEADER is a tuple in settings but comes back
+            # from JSON as a list; compare shapes, not types.
+            return list(value) if isinstance(value, (list, tuple)) else value
+
+        differences = {}
+        for name in self.SECURITY_SETTINGS:
+            expected = normalise(production[name])
+            actual = normalise(getattr(settings, name, None))
+            if expected != actual:
+                differences[name] = (expected, actual)
+
+        self.assertEqual(
+            set(differences), {'SECURE_SSL_REDIRECT'},
+            'test_settings.py must relax exactly one production setting; '
+            f'it currently differs on: {differences}',
+        )
+        self.assertFalse(settings.SECURE_SSL_REDIRECT)
