@@ -856,3 +856,128 @@ class SecuritySettingsUnderTestTests(TestCase):
             f'it currently differs on: {differences}',
         )
         self.assertFalse(settings.SECURE_SSL_REDIRECT)
+
+
+class HealthCheckTests(TestCase):
+    """The probe the container healthcheck and the reverse proxy call."""
+
+    def test_healthz_is_open_and_reports_ok(self):
+        response = APIClient().get('/healthz/')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {'status': 'ok'})
+
+    def test_healthz_leaks_nothing_about_the_deployment(self):
+        """
+        It is reachable unauthenticated through the proxy, so the body must
+        stay a bare status — no version, hostname or settings.
+        """
+        body = APIClient().get('/healthz/').json()
+        self.assertEqual(set(body), {'status'})
+
+    def test_healthz_rejects_writes(self):
+        self.assertEqual(APIClient().post('/healthz/').status_code, 405)
+
+
+@override_settings(
+    SECURE_SSL_REDIRECT=True,
+    SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO', 'https'),
+)
+class ReverseProxyTests(TestCase):
+    """
+    The contract with the external reverse proxy.
+
+    In the deployed configuration SECURE_SSL_REDIRECT is on, so Django decides
+    whether a request was HTTPS purely from the X-Forwarded-Proto header the
+    proxy sets. If SECURE_PROXY_SSL_HEADER is ever removed, every proxied
+    request looks like plain HTTP, Django redirects it to https://, the proxy
+    forwards it back as HTTP, and the site becomes an infinite redirect loop
+    that only shows up once it is behind a real proxy. These tests pin that
+    down where it is cheap to catch.
+    """
+
+    def test_forwarded_https_is_served_not_redirected(self):
+        response = self.client.get('/healthz/', HTTP_X_FORWARDED_PROTO='https')
+        self.assertEqual(
+            response.status_code, 200,
+            'a request the proxy marked as HTTPS must be served, not redirected',
+        )
+
+    def test_plain_http_is_still_redirected(self):
+        """The redirect itself must keep working — this is not a blanket opt-out."""
+        response = self.client.get('/healthz/')
+        self.assertEqual(response.status_code, 301)
+        self.assertTrue(response['Location'].startswith('https://'))
+
+    def _proxied_write(self, origin, forwarded_proto='https'):
+        """
+        POST the way a browser would through the proxy: public https Origin,
+        a real CSRF token from a prior GET, and optionally the proxy's
+        X-Forwarded-Proto header.
+        """
+        user = User.objects.create_superuser('proxy', 'p@x.y', 'pw-12345')
+        category = Category.objects.create(name='Games')
+
+        client = APIClient(enforce_csrf_checks=True)
+        client.force_login(user)
+
+        extra = {'HTTP_HOST': 'coldstorage.example.com'}
+        if forwarded_proto:
+            extra['HTTP_X_FORWARDED_PROTO'] = forwarded_proto
+
+        # A GET is what hands the browser its CSRF cookie in the first place.
+        client.get('/', **extra)
+        token = client.cookies['csrftoken'].value
+
+        return client.post(
+            '/api/items/',
+            {'name': 'Doom', 'category': category.pk},
+            format='json',
+            HTTP_ORIGIN=origin,
+            HTTP_X_CSRFTOKEN=token,
+            **extra,
+        )
+
+    @override_settings(
+        ALLOWED_HOSTS=['coldstorage.example.com', 'testserver'],
+        CSRF_TRUSTED_ORIGINS=['https://coldstorage.example.com'],
+    )
+    def test_proxied_write_is_accepted(self):
+        """The ordinary case: a browser posting through the proxy succeeds."""
+        response = self._proxied_write('https://coldstorage.example.com')
+        self.assertEqual(
+            response.status_code, 201,
+            f'CSRF rejected a legitimate proxied write: {response.content!r}',
+        )
+
+    @override_settings(
+        ALLOWED_HOSTS=['coldstorage.example.com', 'testserver'],
+        CSRF_TRUSTED_ORIGINS=['https://coldstorage.example.com'],
+    )
+    def test_writes_are_impossible_if_the_proxy_omits_the_forwarded_header(self):
+        """
+        Pins how hard the dependency on X-Forwarded-Proto really is.
+
+        CSRF_COOKIE_SECURE is on in the deployed configuration, so if the proxy
+        does not send X-Forwarded-Proto, Django considers the request plain
+        HTTP and never sets a CSRF cookie at all — no amount of trusted-origin
+        configuration recovers that. A proxy that strips the header does not
+        merely weaken the setup, it makes every write impossible. Anything
+        put in front of this app must forward it; Caddy's reverse_proxy does
+        so by default.
+        """
+        client = APIClient(enforce_csrf_checks=True)
+        client.get('/', HTTP_HOST='coldstorage.example.com')
+        self.assertNotIn(
+            'csrftoken', client.cookies,
+            'a secure CSRF cookie must not be issued over an apparently-plain '
+            'HTTP request; if this passes, CSRF_COOKIE_SECURE has been lost',
+        )
+
+    @override_settings(
+        ALLOWED_HOSTS=['coldstorage.example.com', 'testserver'],
+        CSRF_TRUSTED_ORIGINS=['https://coldstorage.example.com'],
+    )
+    def test_foreign_origin_is_still_rejected(self):
+        """The protection is real; the proxy configuration does not defeat it."""
+        response = self._proxied_write('https://evil.example.com')
+        self.assertEqual(response.status_code, 403)

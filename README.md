@@ -34,29 +34,69 @@ storage — operating systems, software, games, media, and scientific archives.
 
 ---
 
-## 🔧 Quick Start (Docker)
+## 🚢 Deploy (single container, behind your reverse proxy)
+
+One container, SQLite on a named volume, no database service to run. It
+publishes **no host port**: your existing reverse proxy reaches it over a
+shared Docker network. The app speaks plain HTTP and should never be the thing
+answering the internet directly.
 
 ```bash
 git clone https://github.com/ethanbissbort/flux-datalist.git
 cd flux-datalist
-docker compose up --build
+./deploy.sh --domain coldstorage.example.com
 ```
 
-The app is then on <http://localhost:8000>. The entrypoint runs migrations on start; SQLite data
-and uploaded media live on named volumes, so they survive `docker compose down`.
+`deploy.sh` writes `.env` (generating a secret key), finds the Docker network
+your Caddy container is on, brings the stack up, waits for it to report
+healthy, offers to create an admin account, and prints the Caddyfile block to
+paste in:
 
-Defaults in `docker-compose.yml` are for local development (`DJANGO_DEBUG=1`). For anything
-real, turn debug off and supply a key — with debug off the container refuses to start without one:
+```caddyfile
+coldstorage.example.com {
+	reverse_proxy coldstorage:8000
+
+	encode zstd gzip
+}
+```
+
+Then `caddy reload`. If Caddy is not on the same network yet:
 
 ```bash
-DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))') \
-DJANGO_DEBUG=0 DJANGO_ALLOWED_HOSTS=coldstorage.example.com \
-docker compose up --build -d
+docker network connect <network> <your-caddy-container>
 ```
 
-PostgreSQL instead of SQLite: set `DJANGO_DB_ENGINE=postgresql` plus `DJANGO_DB_NAME`,
-`DJANGO_DB_USER`, `DJANGO_DB_PASSWORD`, `DJANGO_DB_HOST`, `DJANGO_DB_PORT`. The driver is already
-in the image.
+It is safe to re-run — an existing secret key is never regenerated.
+
+| Flag | Effect |
+|---|---|
+| `--domain <host>` | Public hostname; sets `ALLOWED_HOSTS` and the CSRF origin |
+| `--network <name>` | Override the detected proxy network |
+| `--host-port` | Proxy runs on the host, not in a container: publish `127.0.0.1:8000` instead |
+| `--no-build` | Skip the image build |
+
+**Your proxy must forward `X-Forwarded-Proto`.** Caddy's `reverse_proxy` does
+by default. Without it Django treats every request as plain HTTP, redirects it
+to `https://`, and the proxy hands it back — an infinite loop — and because
+`CSRF_COOKIE_SECURE` is on, no CSRF cookie is issued either, so writes become
+impossible. `ReverseProxyTests` pins both behaviours.
+
+Manual equivalent, if you would rather not use the script:
+
+```bash
+cp .env.example .env      # then edit: secret key, domain, proxy network
+docker compose up -d --build
+```
+
+Health probe: `GET /healthz/` → `{"status": "ok"}`. The container healthcheck
+uses it, and it is safe to expose — it reports no version or configuration.
+
+PostgreSQL instead of SQLite: set `DJANGO_DB_ENGINE=postgresql` plus
+`DJANGO_DB_NAME`/`USER`/`PASSWORD`/`HOST`/`PORT`. The driver is already in the
+image; the database itself is yours to run, since this stack is deliberately
+one container.
+
+---
 
 ## 🔧 Quick Start (local)
 
@@ -189,7 +229,12 @@ All settings are environment-driven.
 | `DJANGO_SECRET_KEY` | generated per checkout | **Required** when `DJANGO_DEBUG=0` — startup fails without it |
 | `DJANGO_ALLOWED_HOSTS` | localhost set | Comma-separated |
 | `DJANGO_DB_ENGINE` | `sqlite3` | or `postgresql` |
+| `DJANGO_CSRF_TRUSTED_ORIGINS` | empty | `https://<domain>` — required for writes behind TLS termination |
 | `COLDSTORAGE_ALLOWED_STORAGE_ROOTS` | `[MEDIA_ROOT]` | Directories `storage_path` may read from |
+| `PROXY_NETWORK` | `caddy` | Docker network shared with the reverse proxy |
+| `WEB_CONCURRENCY` | `3` | Gunicorn workers |
+
+`deploy.sh` writes these into `.env`; see [`.env.example`](.env.example) for the full list.
 
 `DJANGO_DEBUG` defaults to off **except** in a git working tree with the variable unset, which is
 treated as a developer machine so `manage.py` works in a fresh checkout. Images built from the

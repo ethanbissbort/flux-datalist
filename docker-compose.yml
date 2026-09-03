@@ -1,39 +1,82 @@
-# Compose v2: the top-level `version` key is obsolete and is intentionally absent.
+# Cold Storage — single-container deployment behind an external reverse proxy.
 #
-# Defaults here are the local development ones (DJANGO_DEBUG=1), so
-# `docker compose up --build` works out of the box. For anything real, set
-# DJANGO_DEBUG=0 and export a DJANGO_SECRET_KEY - with debug off the container
-# refuses to start without one.
+# Compose v2: the top-level `version` key is obsolete and intentionally absent.
 #
-#   DJANGO_SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))') \
-#   DJANGO_DEBUG=0 DJANGO_ALLOWED_HOSTS=coldstorage.example.com \
-#   docker compose up --build -d
+# The default assumes an existing reverse proxy (Caddy, Traefik, nginx) running
+# in its own container. This service therefore publishes NO host port: it is
+# reachable only on the shared proxy network, as `http://coldstorage:8000`.
+# That is the whole point — the app speaks plain HTTP and has no business being
+# exposed directly; the proxy terminates TLS and forwards X-Forwarded-Proto,
+# which Django reads via SECURE_PROXY_SSL_HEADER.
+#
+# Quick start:      ./deploy.sh
+# Manual start:     docker compose up -d --build
+#
+# If your proxy runs on the host rather than in a container, add the override
+# that publishes a loopback-only port:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.hostport.yml up -d
+#
+# Configuration lives in .env (see .env.example). deploy.sh writes one for you.
 
 services:
-  web:
+  coldstorage:
     build: .
     image: coldstorage:latest
-    # No bind mount of the source tree: it would shadow the dependencies,
-    # collected static files and the non-root ownership the image sets up.
-    ports:
-      - "8000:8000"
+    container_name: ${COMPOSE_SERVICE_NAME:-coldstorage}
+    restart: unless-stopped
+
+    # No bind mount of the source tree: it would shadow the installed
+    # dependencies, the collected static files and the non-root ownership the
+    # image sets up.
     environment:
-      DJANGO_DEBUG: "${DJANGO_DEBUG:-1}"
-      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:-}"
-      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0}"
-      # sqlite by default, on a named volume so it survives `compose down`.
-      # For PostgreSQL: DJANGO_DB_ENGINE=postgresql plus DJANGO_DB_NAME/USER/
-      # PASSWORD/HOST/PORT (psycopg is already in the image).
+      DJANGO_DEBUG: "${DJANGO_DEBUG:-0}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required — run ./deploy.sh or see .env.example}"
+      DJANGO_ALLOWED_HOSTS: "${DJANGO_ALLOWED_HOSTS:?DJANGO_ALLOWED_HOSTS is required — set it to your public domain}"
+      DJANGO_CSRF_TRUSTED_ORIGINS: "${DJANGO_CSRF_TRUSTED_ORIGINS:-}"
+
+      # SQLite on a named volume. One container, one file, no database service
+      # to run. For PostgreSQL set DJANGO_DB_ENGINE=postgresql plus
+      # DJANGO_DB_NAME/USER/PASSWORD/HOST/PORT — psycopg is already in the
+      # image — and point them at a database outside this compose file.
       DJANGO_DB_ENGINE: "${DJANGO_DB_ENGINE:-sqlite3}"
       DJANGO_DB_NAME: "${DJANGO_DB_NAME:-/app/data/db.sqlite3}"
       DJANGO_DB_USER: "${DJANGO_DB_USER:-}"
       DJANGO_DB_PASSWORD: "${DJANGO_DB_PASSWORD:-}"
       DJANGO_DB_HOST: "${DJANGO_DB_HOST:-}"
       DJANGO_DB_PORT: "${DJANGO_DB_PORT:-}"
+
+      DJANGO_LOG_LEVEL: "${DJANGO_LOG_LEVEL:-INFO}"
+      # Gunicorn reads this natively; the image defaults it to 3.
+      WEB_CONCURRENCY: "${WEB_CONCURRENCY:-3}"
+
     volumes:
       - coldstorage-data:/app/data
       - coldstorage-media:/app/coldstorage_project/media
-    restart: unless-stopped
+
+    # The probe runs inside the container against 127.0.0.1, so `localhost`
+    # has to be in DJANGO_ALLOWED_HOSTS or Django answers 400 DisallowedHost.
+    # .env.example and deploy.sh both include it for this reason.
+    healthcheck:
+      # urlopen raises on any non-2xx, so a failure exits non-zero on its own.
+      test: ["CMD", "python", "-c", "import sys,urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/healthz/', timeout=5).status == 200 else 1)"]
+      interval: 30s
+      timeout: 10s
+      start_period: 40s
+      retries: 3
+
+    networks:
+      - proxy
+
+networks:
+  # The network your reverse proxy already runs on. deploy.sh detects it from
+  # the running proxy container and writes PROXY_NETWORK into .env; it is
+  # marked external because this stack joins that network rather than owning
+  # it. To let compose create and manage it instead, set PROXY_NETWORK_EXTERNAL
+  # to false in .env and attach your proxy to the created network.
+  proxy:
+    name: ${PROXY_NETWORK:-caddy}
+    external: ${PROXY_NETWORK_EXTERNAL:-true}
 
 volumes:
   coldstorage-data:

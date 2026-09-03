@@ -1,0 +1,23 @@
+# Optional override: publish a loopback-only host port.
+#
+# Use this when your reverse proxy runs on the host rather than in a container,
+# so it cannot reach the app over a shared Docker network:
+#
+#     docker compose -f docker-compose.yml -f docker-compose.hostport.yml up -d
+#
+# The bind address defaults to 127.0.0.1 deliberately. Publishing "8000:8000"
+# binds 0.0.0.0 and exposes the app to every interface on the machine —
+# including, on many hosts, the public one, bypassing the proxy and its TLS.
+# The app speaks plain HTTP; it should never be the thing answering the
+# internet directly.
+#
+# Caddyfile for this mode proxies to the host instead of the container name:
+#
+#     coldstorage.example.com {
+#         reverse_proxy 127.0.0.1:8000
+#     }
+
+services:
+  coldstorage:
+    ports:
+      - "${PUBLISH_BIND:-127.0.0.1}:${PUBLISH_PORT:-8000}:8000"

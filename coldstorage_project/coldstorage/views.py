@@ -9,10 +9,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.views import redirect_to_login
+from django.db import connections
 from django.db.models import Count, Sum, Avg, Q
 from django.shortcuts import render, redirect
 from django.contrib import messages
-from django.http import HttpRequest, HttpResponse
+from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.views.decorators.http import require_http_methods
 
 from .models import (
@@ -693,3 +694,22 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     }
 
     return render(request, 'dashboard.html', context)
+
+
+@require_http_methods(["GET"])
+def healthz(request: HttpRequest) -> JsonResponse:
+    """
+    Liveness probe for the container healthcheck and the reverse proxy.
+
+    Deliberately unauthenticated and cheap: it confirms the WSGI app is up and
+    the database answers, and nothing else. It reports no version, hostname or
+    configuration, so exposing it through the proxy leaks nothing useful.
+    """
+    try:
+        with connections['default'].cursor() as cursor:
+            cursor.execute('SELECT 1')
+    except Exception:  # noqa: BLE001 - the probe must answer, not raise
+        logger.exception('Health check failed: database unreachable')
+        return JsonResponse({'status': 'error'}, status=503)
+
+    return JsonResponse({'status': 'ok'})

@@ -37,8 +37,11 @@ flux-datalist/
 │   ├── sample_data/              # Seed JSON in the app's import format
 │   └── manage.py                 # Django management script
 ├── AUDIT.md                      # Repository audit — authoritative defect record
+├── deploy.sh                     # One-shot deploy; prints the Caddyfile block
+├── .env.example                  # Deployment configuration template
 ├── Dockerfile                    # Docker configuration
-├── docker-compose.yml            # Docker Compose setup
+├── docker-compose.yml            # Single container, external reverse proxy
+├── docker-compose.hostport.yml   # Override: publish 127.0.0.1 (proxy on host)
 ├── docker-entrypoint.sh          # Migrates, then execs gunicorn
 ├── requirements.txt              # Python dependencies
 └── setup_project.py              # Seeds initial categories
@@ -185,7 +188,14 @@ These are not style preferences. Each one is a defect that reached `main` and is
    stays on. `SecuritySettingsUnderTestTests` diffs the module against the real settings and fails
    if a second relaxation appears — do not silence it to make a test pass.
 
-9. **Vue templates must sit inside `{% verbatim %}`.** Django renders `{{ }}` server-side first and
+9. **The deployment depends on the proxy forwarding `X-Forwarded-Proto`.** With debug off,
+   `SECURE_SSL_REDIRECT` is on and Django decides a request was HTTPS solely from that header via
+   `SECURE_PROXY_SSL_HEADER`. Remove it and every proxied request becomes an infinite redirect
+   loop; `CSRF_COOKIE_SECURE` also stops a CSRF cookie ever being issued, so writes become
+   impossible. `ReverseProxyTests` pins both. The container publishes no host port by design — it
+   is reachable only on the proxy's Docker network.
+
+10. **Vue templates must sit inside `{% verbatim %}`.** Django renders `{{ }}` server-side first and
    will otherwise silently blank every Vue binding.
 
 ## Notes for Claude Code

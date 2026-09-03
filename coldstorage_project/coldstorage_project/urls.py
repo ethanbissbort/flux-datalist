@@ -7,7 +7,12 @@ from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.authtoken.views import obtain_auth_token
 
+from coldstorage.views import healthz
+
 urlpatterns = [
+    # Container healthcheck and reverse-proxy probe. Kept at the project root
+    # and above everything else so it stays cheap and stable.
+    path('healthz/', healthz, name='healthz'),
     path('admin/', admin.site.urls),
     # Django's default LOGIN_URL is /accounts/login/. The web views redirect
     # unauthenticated writers there, so the route has to exist — otherwise the
