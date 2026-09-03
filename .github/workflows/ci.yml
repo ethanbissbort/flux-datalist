@@ -92,6 +92,54 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      - name: Validate the compose files
+        # docker-compose.yml is the primary deployment interface, but the
+        # steps below drive `docker run` directly and would never notice it
+        # breaking. `docker compose config` needs no daemon and catches YAML
+        # errors, bad interpolation and invalid keys. Runs before the build so
+        # a broken compose file fails in seconds rather than after an image.
+        env:
+          DJANGO_SECRET_KEY: ci-validation-only
+          DJANGO_ALLOWED_HOSTS: ci.example.com
+        run: |
+          echo "--- default: external reverse-proxy network"
+          docker compose config -q
+          echo "--- host-port override"
+          docker compose -f docker-compose.yml -f docker-compose.hostport.yml config -q
+          echo "--- compose-managed network"
+          PROXY_NETWORK_EXTERNAL=false docker compose config -q
+
+      - name: Compose refuses to start without the required settings
+        # The guards are the difference between a clear error and a container
+        # that boots with no secret key. Assert they actually fire.
+        #
+        # Neither variable is set at job level, so each case simply omits the
+        # one under test. This step runs before .env.example is copied into
+        # place, because compose auto-loads .env and would otherwise satisfy
+        # the very variable being tested.
+        run: |
+          if DJANGO_ALLOWED_HOSTS=x docker compose config -q >/dev/null 2>&1; then
+            echo "::error::compose accepted a missing DJANGO_SECRET_KEY"
+            exit 1
+          fi
+          echo "--- correctly rejected a missing DJANGO_SECRET_KEY"
+
+          if DJANGO_SECRET_KEY=x docker compose config -q >/dev/null 2>&1; then
+            echo "::error::compose accepted a missing DJANGO_ALLOWED_HOSTS"
+            exit 1
+          fi
+          echo "--- correctly rejected a missing DJANGO_ALLOWED_HOSTS"
+
+      - name: .env.example is a working starting point
+        # The README tells people to `cp .env.example .env`. That path has to
+        # produce a compose file that parses, or the first thing a new
+        # deployment hits is an interpolation error.
+        run: |
+          cp .env.example .env
+          sed -i 's/^DJANGO_SECRET_KEY=$/DJANGO_SECRET_KEY=ci-validation-only/' .env
+          docker compose config -q
+          rm -f .env
+
       - name: Build image
         # The Dockerfile was unbuildable for the whole life of the repo: it ran
         # `python manage.py` from /app while manage.py sits in

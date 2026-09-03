@@ -22,6 +22,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Log to stdout/stderr only; a log file inside a container is a dead end.
 ENV DJANGO_LOG_FILE=""
 
+# Gunicorn reads WEB_CONCURRENCY natively for the worker count (its own
+# default is 1). Setting it here rather than passing --workers keeps the value
+# tunable from compose or `docker run -e` without overriding CMD.
+ENV WEB_CONCURRENCY=3
+
 WORKDIR /app
 
 # Install dependencies first so this layer is cached independently of the code.
@@ -55,7 +60,6 @@ EXPOSE 8000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["gunicorn", "coldstorage_project.wsgi:application", \
      "--bind", "0.0.0.0:8000", \
-     "--workers", "3", \
      "--timeout", "60", \
      "--access-logfile", "-", \
      "--error-logfile", "-"]
